@@ -4,36 +4,12 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const { createCollector } = require('./collector');
-const { createPostgresSource } = require('./sources/postgres');
-const { createSheetSource } = require('./sources/sheet');
+const { loadConfig, createSources } = require('./config');
 
 try { process.loadEnvFile(path.join(__dirname, '..', '.env')); } catch (e) { /* no .env: use the real environment */ }
 
-const env = process.env;
-const flag = (v, d) => (v == null || v === '' ? d : /^(1|true|yes|on)$/i.test(v));
-
-const config = {
-  port: parseInt(env.PORT || '3000', 10),
-  pollMs: Math.max(5000, parseInt(env.POLL_MS || '30000', 10)),
-  sources: (env.DATA_SOURCES || 'postgres,sheet').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
-  pg: {
-    url: env.DATABASE_URL,
-    query: env.PG_QUERY,
-    ssl: flag(env.PG_SSL, false),
-    sslRejectUnauthorized: flag(env.PG_SSL_REJECT_UNAUTHORIZED, true)
-  },
-  sheet: { url: env.SHEET_URL, gid: env.SHEET_GID || '0' }
-};
-
-const sources = [];
-if (config.sources.includes('postgres')) {
-  if (config.pg.url) sources.push(createPostgresSource(config.pg));
-  else console.warn('[postgres] DATABASE_URL kosong, sumber Postgres dilewati');
-}
-if (config.sources.includes('sheet')) {
-  if (config.sheet.url) sources.push(createSheetSource(config.sheet));
-  else console.warn('[sheet] SHEET_URL kosong, sumber Sheet dilewati');
-}
+const config = loadConfig(process.env);
+const sources = createSources(config, console.warn);
 if (!sources.length) {
   console.error('Tidak ada sumber data. Isi DATABASE_URL dan/atau SHEET_URL (lihat .env.example).');
   process.exit(1);

@@ -27,6 +27,28 @@ npm start              # http://localhost:3000
 
 Atau semua sekaligus dengan Postgres contoh: `docker compose up --build`.
 
+## Deploy ke Netlify
+
+Repo ini sudah siap untuk Netlify (`netlify.toml`):
+
+- Halaman TV dipublish dari `public/`.
+- `/api/state` dan `/healthz` dilayani Netlify Function `netlify/functions/state.mjs`, yang memakai
+  kode yang sama dengan server Node (`server/`).
+- Build menjalankan `npm test`; deploy batal kalau tes gagal.
+
+Langkah:
+
+1. Di Netlify: **Project configuration → Environment variables**, isi `DATABASE_URL`, `SHEET_URL`,
+   `SHEET_GID`, dan bila perlu `PG_QUERY`, `PG_SSL=true` (lihat tabel di bawah).
+2. Database harus bisa diakses dari internet (Netlify Functions berjalan di AWS, bukan di jaringan kantor).
+   Untuk Postgres terkelola (Supabase, Neon, RDS), pakai URL *pooler* bila tersedia.
+3. Deploy ulang. Cek `https://<site>.netlify.app/healthz` → `200` artinya minimal satu sumber terbaca.
+
+Bedanya dengan server Node: di Netlify sumber data dibaca saat ada request (bukan timer), lalu hasilnya
+di-cache di CDN Netlify selama `CACHE_SECONDS`. Jadi berapa pun TV yang membuka halaman, Postgres dan
+Sheet dibaca paling sering sekali per `CACHE_SECONDS`. Kalau satu sumber gagal, data terakhirnya hanya
+bertahan selama instance function masih hangat.
+
 Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah baris valid / dilewati per sumber.
 
 ## Konfigurasi (`.env`)
@@ -39,7 +61,8 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 | `SHEET_URL` | – | Link Sheet (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. Kosong = sumber Sheet dilewati. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
 | `DATA_SOURCES` | `postgres,sheet` | Batasi sumber, mis. `postgres` saja. |
-| `POLL_MS` | `30000` | Interval baca ulang (min 5000). |
+| `POLL_MS` | `30000` | Interval baca ulang di server Node, sekaligus interval polling halaman TV (min 5000). |
+| `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN. |
 | `PORT` | `3000` | Port HTTP. |
 
 ### Postgres

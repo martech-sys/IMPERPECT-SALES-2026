@@ -1,13 +1,13 @@
 'use strict';
 
-const { Pool } = require('pg');
-
 /* The query must return one row per transaction with the columns
    phone, name, qty, value. Override PG_QUERY to map your own table, e.g.
    SELECT no_hp AS phone, nama AS name, jumlah AS qty, total AS value FROM penjualan WHERE event = 'imperfect-2026' */
 const DEFAULT_QUERY = 'SELECT phone, name, qty, trx_value AS value FROM transactions';
 
 function createPostgresSource(cfg) {
+  // the Netlify Function passes its own statically imported Pool so the bundler ships pg
+  const Pool = cfg.Pool || require('pg').Pool;
   const pool = new Pool({
     connectionString: cfg.url,
     ssl: cfg.ssl ? { rejectUnauthorized: cfg.sslRejectUnauthorized } : undefined,
