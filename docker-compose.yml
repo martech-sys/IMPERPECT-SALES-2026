@@ -1,0 +1,36 @@
+# Coba lokal: docker compose up --build  ->  http://localhost:3000
+# Postgres diisi db/schema.sql + db/seed.sql saat pertama kali dibuat.
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: imperfect
+      POSTGRES_PASSWORD: imperfect
+      POSTGRES_DB: imperfect
+    volumes:
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./db/seed.sql:/docker-entrypoint-initdb.d/02-seed.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U imperfect -d imperfect"]
+      interval: 5s
+      retries: 10
+
+  app:
+    build: .
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://imperfect:imperfect@db:5432/imperfect
+      SHEET_URL: ${SHEET_URL:-https://docs.google.com/spreadsheets/d/1PxiUbW5nFohIkVMae8m2yd-OWzrqOcwSavEv8In6Uok/edit?gid=949297504}
+      SHEET_GID: ${SHEET_GID:-949297504}
+      PG_QUERY: ${PG_QUERY:-}
+      POLL_MS: ${POLL_MS:-30000}
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:

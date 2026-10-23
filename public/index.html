@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Imperfect Sale Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;700;800&family=Tiny5&display=swap" rel="stylesheet">
+<style>
+/* Layout: fixed 16:9 TV stage (1rem = 1% of stage width).
+   Data comes from /api/state (Postgres + Google Sheet merged on the server).
+   Left: logo, total sales, tile progress bar and the four prize cards under their segments.
+   Right: Top Spender Jastiper board and three counters.
+   One look on purpose: orange KV, white type, read from across a room. */
+:root{
+  --orange:#E2531F;
+  --orange-deep:#C63E16;
+  --amber:#F0A04B;
+  --cream:#FFF6EC;
+  --sun:#F6C65B;
+  --ink:#2A1409;
+  --line:rgba(255,246,236,.4);
+  --tile-off:rgba(110,26,0,.27);
+  --tile-edge:rgba(255,205,165,.2);
+  --panel:#2A1409;
+  --font-display:'Tiny5','Courier New',monospace;
+  --font-body:'Hanken Grotesk','Helvetica Neue',Arial,sans-serif;
+  --hero:10.8rem;
+  font-size:min(1vw,1.7778vh);
+}
+[hidden]{display:none!important}
+html,body{height:100%}
+body{
+  margin:0;display:grid;place-items:center;overflow:hidden;position:relative;
+  background-color:var(--orange);
+  background-image:linear-gradient(165deg,#E85A22 0%,#DE4B1D 48%,#C63E16 100%);
+  color:var(--cream);font-family:var(--font-body);font-variant-numeric:tabular-nums;
+}
+.swoosh{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;z-index:0}
+.grain{position:fixed;inset:0;pointer-events:none;z-index:1;opacity:.38;mix-blend-mode:soft-light;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 .7 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>")}
+
+.stage{
+  position:relative;z-index:2;box-sizing:border-box;
+  width:100rem;height:56.25rem;padding:3.2rem 4rem;
+  display:grid;grid-template-columns:54rem 1fr;column-gap:4rem;overflow:hidden;
+}
+.lastup{position:absolute;right:4rem;bottom:1rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
+.left{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
+.right{display:flex;flex-direction:column;min-width:0}
+
+/* header */
+.head{display:flex;justify-content:space-between;align-items:flex-start;gap:2rem}
+.logo{display:block;width:22rem;height:auto;max-width:100%}
+.chips{display:flex;flex-direction:column;align-items:flex-end;gap:.8rem}
+.chip{display:inline-flex;align-items:center;gap:.7rem;font-weight:700;font-size:1.4rem;letter-spacing:.12em;text-transform:uppercase;
+  padding:.55rem 1.1rem;border:.16rem solid var(--cream);color:var(--cream)}
+.chip .dot{width:.9rem;height:.9rem;background:var(--sun);animation:pulse 1.8s ease-in-out infinite}
+.chip.sample{background:var(--sun);border-color:var(--sun);color:var(--ink)}
+.chip.sample .dot{display:none}
+button.chip{font-family:inherit;cursor:pointer}
+.chip.diag{background:transparent;border-color:rgba(255,246,236,.5);text-transform:none;letter-spacing:.02em;font-size:1.2rem}
+[hidden]{display:none!important}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* hero */
+.hero-label{font-weight:700;font-size:1.9rem;letter-spacing:.16em;text-transform:uppercase;opacity:.92;margin:0 0 .4rem}
+.hero{display:flex;align-items:baseline;gap:1.2rem;line-height:1;white-space:nowrap}
+.hero .rp{font-weight:700;font-size:3.6rem}
+.hero .num{font-weight:800;font-size:var(--hero);letter-spacing:-.03em}
+.hero .unit{font-weight:700;font-size:4.6rem}
+
+/* next target */
+.target{display:flex;align-items:center;gap:1.6rem;margin:0;font-size:2.2rem;line-height:1.2;font-weight:500;min-height:5.2rem}
+.target b{font-weight:800}
+.target .arrow{flex:none;width:3.4rem;height:3.4rem;transform:rotate(35deg)}
+.target .arrow polygon{fill:var(--sun)}
+
+/* tile progress bar */
+.cap{margin:0 0 .9rem;font-weight:700;font-size:1.3rem;letter-spacing:.14em;text-transform:uppercase;opacity:.92}
+.bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+.seg{display:grid;grid-template-columns:repeat(10,1fr);gap:.22rem}
+.tile{position:relative;height:3.6rem;background:var(--tile-off);box-shadow:inset 0 0 0 .1rem var(--tile-edge)}
+.tile::after{content:"";position:absolute;inset:0 auto 0 0;width:var(--f,0%);
+  background:linear-gradient(180deg,#FFFCF7,#FFEEDD);
+  box-shadow:inset -.16rem -.16rem 0 rgba(120,50,20,.3),inset .12rem .12rem 0 rgba(255,255,255,.95);
+  transition:width .9s cubic-bezier(.2,.7,.2,1)}
+
+/* prize cards */
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem;margin-top:1rem}
+.cap .one{display:inline-block;margin-left:.9rem;padding:.2rem .7rem;background:var(--sun);color:var(--ink);letter-spacing:.06em}
+.card{box-sizing:border-box;min-height:8.6rem;padding:.9rem 1rem 1rem;display:flex;flex-direction:column;gap:.45rem;
+  background:var(--tile-off);color:var(--cream)}
+.card .at{font-family:var(--font-display);font-size:2.2rem;white-space:nowrap;line-height:1;letter-spacing:.02em}
+.card .prize{font-weight:800;font-size:1.65rem;line-height:1.12;flex:1;overflow-wrap:anywhere}
+.card .state{font-weight:700;font-size:1.25rem;letter-spacing:.06em;text-transform:uppercase;opacity:.85}
+.card.locked{opacity:.78}
+.card.open{background:var(--cream);color:var(--ink)}
+.card.open .state{opacity:1;align-self:flex-start;background:var(--sun);padding:.25rem .7rem}
+.card.next{background:transparent;outline:.24rem solid var(--sun);outline-offset:-.24rem}
+.card.next .state{color:var(--sun);opacity:1}
+
+/* board */
+.board-title{font-family:var(--font-display);font-size:2.6rem;line-height:1;margin:0;letter-spacing:.03em;text-transform:uppercase;white-space:nowrap}
+.board-sub{margin:.7rem 0 1.1rem;font-size:1.45rem;font-weight:500;opacity:.9}
+.rows{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.row{position:relative;display:grid;grid-template-columns:3.3rem minmax(0,1fr) auto;align-items:center;column-gap:.8rem;height:3.9rem;padding:0 .8rem;border-bottom:.1rem solid var(--line);box-sizing:border-box}
+.row .rk{font-family:var(--font-display);font-size:2.4rem;line-height:1}
+.row .who{min-width:0;display:flex;flex-direction:column;gap:.1rem}
+.row .ph{font-weight:800;font-size:1.55rem;line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
+.row .nm{font-weight:500;font-size:1.2rem;line-height:1.1;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .val{text-align:right;display:flex;flex-direction:column;gap:.1rem}
+.row .val b{font-weight:800;font-size:1.7rem;line-height:1.05;white-space:nowrap}
+.row .val small{font-weight:500;font-size:1.15rem;opacity:.88;white-space:nowrap}
+.row::after{content:"";position:absolute;left:0;bottom:-.1rem;height:.3rem;width:var(--p,0%);background:var(--sun)}
+.row.got .val small{color:var(--sun);opacity:1;font-weight:700}
+.row.first.got .val small{color:var(--orange-deep)}
+.row.first::after{background:var(--orange-deep)}
+.row.first{height:5rem;background:var(--cream);color:var(--ink);border-bottom:0;margin-bottom:.1rem}
+.row.first .rk{color:var(--orange-deep);font-size:3rem}
+.row.first .ph{font-size:1.7rem}
+.row.first .val b{font-size:1.95rem}
+.empty{font-weight:500;font-size:1.8rem;line-height:1.3;padding:1.6rem .8rem;border-top:.1rem solid var(--line)}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:1rem;margin-top:auto}
+.stat{border-top:.2rem solid var(--cream);padding-top:.8rem}
+.stat b{display:block;font-weight:800;font-size:3.4rem;line-height:1}
+.stat span{display:block;margin-top:.5rem;font-weight:700;font-size:1.25rem;letter-spacing:.12em;text-transform:uppercase;opacity:.92}
+
+
+@media (max-width:900px){
+  :root{font-size:2.55vw;--hero:7.6rem}
+  body{display:block;height:auto;min-height:100%;overflow:auto}
+  .stage{width:auto;height:auto;padding:3rem 16px 6rem;grid-template-columns:1fr;row-gap:4rem;overflow:visible}
+  .left{gap:2.4rem}
+  .head{flex-direction:column;gap:1.4rem}
+  .logo{width:min(100%,38rem)}
+  .chips{align-items:flex-start;flex-direction:row;flex-wrap:wrap}
+  .hero .rp{font-size:2.6rem}.hero .unit{font-size:3.2rem}
+  .target{font-size:2rem;min-height:0}
+  .target .arrow{width:2.8rem;height:2.8rem}
+  .tile{height:2.8rem}
+  .cards{grid-template-columns:repeat(2,1fr)}
+  .board-title{font-size:2.4rem;white-space:normal}
+  .row{height:auto;min-height:4.6rem;padding:.6rem .6rem}
+  .row.first{height:auto;min-height:6rem}
+  .stats{margin-top:2rem}
+}
+@media (prefers-reduced-motion:reduce){.chip .dot{animation:none}.tile::after{transition:none}}
+</style>
+</head>
+<body>
+
+<svg class="swoosh" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+  <defs><filter id="soft" x="-10%" y="-10%" width="120%" height="120%"><feGaussianBlur stdDeviation="14"/></filter></defs>
+  <g fill="none" stroke-linecap="round" filter="url(#soft)">
+    <path d="M1680 -60 C1250 40 1180 330 820 420 S 260 560 -80 860" stroke="#F0A04B" stroke-opacity=".42" stroke-width="210"/>
+    <path d="M1700 520 C1380 560 1180 760 1000 960" stroke="#F0A04B" stroke-opacity=".3" stroke-width="150"/>
+  </g>
+</svg>
+<div class="grain" aria-hidden="true"></div>
+
+<main class="stage" id="stage">
+  <section class="left" aria-label="Progres hadiah">
+    <header class="head">
+      <img class="logo" alt="Imperfect Sale 2026" src="logo.png">
+      <div class="chips">
+        <span class="chip" id="chip-live"><i class="dot"></i><span id="live-text">Live</span></span>
+        <span class="chip sample" id="chip-sample" hidden>Data contoh</span>
+        <button class="chip sample act" id="chip-action" type="button" hidden></button>
+        <span class="chip diag" id="chip-diag" hidden></span>
+      </div>
+    </header>
+
+    <div>
+      <p class="hero-label">Juara sementara</p>
+      <div class="hero" aria-live="polite"><span class="rp">Rp</span><span class="num" id="hero-num">0</span><span class="unit" id="hero-unit">mio</span></div>
+    </div>
+
+    <p class="target" id="target">
+      <svg class="arrow" viewBox="0 0 60 60" aria-hidden="true"><polygon points="18,4 42,4 42,28 54,28 30,56 6,28 18,28"/></svg>
+      <span id="target-text"></span>
+    </p>
+
+    <div>
+      <p class="cap">Level hadiah <b class="one">1 jastiper = 1 hadiah tertinggi</b></p>
+      <div class="bar" id="bar" aria-hidden="true"></div>
+      <div class="cards" id="cards"></div>
+    </div>
+  </section>
+
+  <section class="right" aria-label="Top Spender Jastiper">
+    <h2 class="board-title">Top Spender Jastiper</h2>
+    <p class="board-sub">Belanja terbesar per nomor HP</p>
+    <ol class="rows" id="rows"></ol>
+  </section>
+  <div class="lastup" id="lastup">Last update: <span id="lastup-t">menunggu data...</span></div>
+</main>
+
+
+<script src="app.js"></script>
+</body>
+</html>
