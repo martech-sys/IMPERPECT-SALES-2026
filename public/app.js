@@ -12,6 +12,7 @@ var TIERS=[
   {at:400e6,prize:'Yamaha Aerox / Grand Filano',short:'Motor Yamaha'}
 ];
 var TOP_N=20, TILE_VALUE=10e6, TILES=40;
+var PINNED=3; // ranks that stay fixed at the top of the board; the rest scroll
 var TICK_SEC_PER_ROW=2.4; // scroll speed of the board: seconds per row
 var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',jubelio:'Jubelio'};
 var LS_KEY='imperfect-live-state-v3';
@@ -152,7 +153,7 @@ function render(s){
     val.appendChild(el('b',null,money(r.v)));
     val.appendChild(el('small',null,u>=0?'Dapat '+TIERS[u].short:Math.floor(pct)+'% ke '+TIERS[0].short));
     li.appendChild(val);
-    (i===0?head:rows).appendChild(li);
+    (i<PINNED?head:rows).appendChild(li);
   });
   layoutTicker();
 
@@ -161,7 +162,7 @@ function render(s){
   if(!isSample&&s.updatedAt) $('live-text').textContent='Live · update '+clock(s.updatedAt);
   note.textContent='Data contoh';note.hidden=!isSample;act.hidden=true;
 }
-/* ---------- board ticker: #2-#20 scroll upward in a loop ---------- */
+/* ---------- board ticker: #4-#20 scroll upward in a loop ---------- */
 /* Driven by requestAnimationFrame with the offset kept across renders, so a
    data refresh every poll does not make the list jump back to the top. */
 var tick={off:0,half:0,last:0,raf:0};
