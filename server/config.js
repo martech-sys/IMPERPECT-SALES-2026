@@ -25,7 +25,6 @@ function loadConfig(env) {
       password: env.JUBELIO_PASSWORD,
       api: env.JUBELIO_API,
       location: env.JUBELIO_LOCATION,
-      locationId: env.JUBELIO_LOCATION_ID,
       dateFrom: env.JUBELIO_DATE_FROM,
       dateTo: env.JUBELIO_DATE_TO,
       valueField: env.JUBELIO_VALUE_FIELD,
