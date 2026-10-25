@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { toNum, normPhone, parseCSV, rowsToRecords, aggregate, buildState } = require('../server/aggregate');
 const { sheetCsvUrl } = require('../server/sources/sheet');
+const { pgNumber } = require('../server/sources/postgres');
 
 test('toNum reads rupiah in the formats people type', () => {
   assert.equal(toNum('3000000'), 3000000);
@@ -55,4 +56,13 @@ test('sheetCsvUrl turns a share link into the CSV export URL', () => {
   assert.equal(sheetCsvUrl('ABC_123', '5'), 'https://docs.google.com/spreadsheets/d/ABC_123/gviz/tq?tqx=out:csv&gid=5');
   const pub = 'https://docs.google.com/spreadsheets/d/e/XYZ/pub?output=csv';
   assert.equal(sheetCsvUrl(pub), pub);
+});
+
+test('pgNumber reads Postgres NUMERIC strings at any scale', () => {
+  assert.equal(pgNumber('2500000.0000'), 2500000);
+  assert.equal(pgNumber('2500000'), 2500000);
+  assert.equal(pgNumber('1.5000'), 2);
+  assert.equal(pgNumber(1200), 1200);
+  assert.equal(pgNumber(null), null);
+  assert.equal(pgNumber('Rp 2.500.000'), 'Rp 2.500.000', 'human formats are left to toNum');
 });

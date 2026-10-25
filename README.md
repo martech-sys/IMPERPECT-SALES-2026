@@ -71,21 +71,38 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 | `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN. |
 | `PORT` | `3000` | Port HTTP. |
 
-### Postgres
+### Postgres (warehouse `we_data_store`) — sumber event 2026
 
-Pakai tabel bawaan (`db/schema.sql`):
-
-```bash
-npm run db:init        # buat tabel transactions
-npm run db:seed        # opsional: data contoh, jangan di produksi
-```
-
-Atau arahkan ke tabel yang sudah ada lewat `PG_QUERY`, contoh:
+Transaksi event dibaca dari tabel **`laporan_penjualan`** di warehouse `we_data_store` (sama dengan yang
+dipakai dashboard OFFLINE-STORE). Tabel itu berisi **satu baris per produk**, dengan kolom pelanggan
+`nama` dan `no_hp`, jadi `PG_QUERY` menjumlahkannya per invoice:
 
 ```sql
-SELECT no_hp AS phone, nama AS name, jumlah AS qty, total AS value
-FROM penjualan WHERE event = 'imperfect-2026'
+SELECT no_hp AS phone, MAX(nama) AS name, SUM(qty) AS qty, SUM(total_harga_barang) AS value
+  FROM laporan_penjualan
+ WHERE warehouse = 'MAIN IMPERFECT WAREHOUS 2026'          -- atau channel = '...', lihat cek di bawah
+   AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
+ GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order), no_hp
 ```
+
+- Nilai = `total_harga_barang` (tingkat baris). `total_bayar` adalah total invoice yang berulang di tiap
+  baris produknya, jadi menjumlahkannya menggelembungkan angka.
+- Batas atas ditulis `< hari berikutnya`, agar transaksi di hari terakhir tidak terbuang kalau `tanggal`
+  bertipe timestamp.
+- Transaksi tanpa `no_hp` tidak masuk papan (terlihat sebagai "dilewati" di `#cek`).
+- Angka `numeric` dari Postgres (mis. `"2500000.0000"`) dibaca dengan benar.
+
+**Sebelum event**, jalankan `scripts/cek-event-postgres.sql` dengan user read-only. Skrip ini hanya
+mencetak nama kolom, nama store/gudang, status, dan hitungan (tanpa data pelanggan) untuk memastikan:
+kolom penyaring event (`warehouse` atau `channel`) dan nilainya, seberapa banyak transaksi event yang
+punya `no_hp`, status apa yang perlu dibuang (batal/retur), dan seberapa cepat transaksi masuk ke tabel.
+
+```bash
+psql "$DATABASE_URL" -f scripts/cek-event-postgres.sql
+```
+
+Untuk tabel lain, cukup ganti `PG_QUERY`; kolom yang dibutuhkan selalu `phone, name, qty, value`.
+Tabel contoh untuk uji lokal ada di `db/schema.sql` + `db/seed.sql` (`npm run db:init`, `npm run db:seed`).
 
 ### Jubelio
 
