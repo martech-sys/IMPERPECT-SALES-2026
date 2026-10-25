@@ -63,9 +63,10 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
 | `DATA_SOURCES` | `postgres,sheet,jubelio` | Batasi sumber, mis. `jubelio` saja. |
 | `JUBELIO_EMAIL`, `JUBELIO_PASSWORD` | – | Login API Jubelio. Kosong = sumber Jubelio dilewati. |
-| `JUBELIO_LOCATION` / `JUBELIO_LOCATION_ID` | – | Gudang yang dibaca, mis. `Imperfect Sales 2025`. |
+| `JUBELIO_LOCATION` / `JUBELIO_LOCATION_ID` | – | Gudang yang dibaca: `MAIN IMPERFECT WAREHOUS 2026` / `26`. |
 | `JUBELIO_DATE_FROM`, `JUBELIO_DATE_TO` | – / tanpa batas | Rentang tanggal transaksi event (WIB, `YYYY-MM-DD`). `FROM` wajib. |
 | `JUBELIO_VALUE_FIELD` | `grand_total` | Kolom nilai dari detail order, mis. `sub_total`. |
+| `JUBELIO_BUDGET_MS` | `20000` (Netlify `7000`) | Batas waktu sinkron Jubelio per pembacaan. |
 | `POLL_MS` | `30000` | Interval baca ulang di server Node, sekaligus interval polling halaman TV (min 5000). |
 | `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN. |
 | `PORT` | `3000` | Port HTTP. |
@@ -88,17 +89,27 @@ FROM penjualan WHERE event = 'imperfect-2026'
 
 ### Jubelio
 
-Sumber ini hanya **membaca**: `POST /login` untuk token, sisanya `GET`. Perilaku API mengikuti catatan
-yang sudah diverifikasi di `martech-sys/data-db` (`docs/jubelio-api.md`).
+Sumber ini hanya **membaca**: `POST /login` untuk token, sisanya `GET`. Perilaku API sudah dicek di akun
+ini (lihat juga `martech-sys/data-db`, `docs/jubelio-api.md`):
 
-1. `GET /sales/orders/` dengan `transactionDateFrom`/`To` dari `JUBELIO_DATE_FROM`/`JUBELIO_DATE_TO` (WIB),
-   lalu disaring ke gudang `JUBELIO_LOCATION` (nama, tidak peka huruf besar/kecil) atau `JUBELIO_LOCATION_ID`.
-   Order batal dilewati kecuali `JUBELIO_INCLUDE_CANCELED=true`.
-2. Nomor HP dan item hanya ada di detail order, jadi tiap order dibaca dengan `GET /sales/orders/{id}`
-   (±1 detik per order, 5 paralel). Detail disimpan di memori dan hanya dibaca ulang kalau
-   `last_modified` order berubah.
-3. HP = `customer_phone`, atau `shipping_phone` bila kosong. Nama = `customer_name`.
-   Qty = jumlah `qty_in_base` item yang tidak dibatalkan. Nilai = `grand_total` (atau `JUBELIO_VALUE_FIELD`).
+- Gudang event 2026: **`MAIN IMPERFECT WAREHOUS 2026`** (id lokasi 26, outlet POS).
+- `GET /sales/orders/` tidak bisa difilter per lokasi, jadi order di rentang `JUBELIO_DATE_FROM`–`TO` (WIB)
+  dibaca lalu disaring ke `JUBELIO_LOCATION` (nama, tidak peka huruf besar/kecil) atau `JUBELIO_LOCATION_ID`.
+  Order batal dilewati.
+- **Nomor HP di order disamarkan Jubelio** (`**********99`). Nomor lengkap diambil dari
+  `GET /contacts/{contact_id}` (kolom `phone`), sekali per pembeli.
+- **Order "Pelanggan Umum" (walk-in, `contact_id` -1) tidak punya nomor HP**, jadi tidak masuk papan
+  (terlihat sebagai "dilewati" / "tanpa HP" di `#cek`). Supaya belanja jastiper terhitung, kasir harus
+  memilih atau membuat kontak pembeli **dengan nomor HP** di POS.
+- Kontak yang belum punya HP dicoba lagi tiap 5 menit, jadi nomor yang ditambahkan belakangan tetap masuk.
+- Nilai = `grand_total` (atau `JUBELIO_VALUE_FIELD`), angka string seperti `"750000.0000"` dikonversi
+  dengan benar. Qty = jumlah `qty_in_base` item yang tidak batal.
+
+Sinkronisasinya bertahap dengan batas waktu `JUBELIO_BUDGET_MS` per pembacaan: pemindaian pertama
+berjalan halaman per halaman dan dilanjutkan pada pembacaan berikutnya, setelah itu hanya order yang
+berubah yang dibaca (`lastModifiedSince`). Di Netlify, progresnya disimpan di **Netlify Blobs**
+(store `imperfect-jubelio`, berisi nomor HP pembeli), jadi function yang baru menyala melanjutkan dari
+situ. Progres terlihat di `#cek` ("memindai order", "N menunggu kontak", "N tanpa HP").
 
 Kredensial Jubelio cukup di `.env` / environment variables hosting. Jangan di-commit.
 

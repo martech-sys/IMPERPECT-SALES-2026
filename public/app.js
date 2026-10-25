@@ -218,6 +218,9 @@ function showDiag(snap){
     if(!s.ok&&!s.stale) return label(k)+': '+(s.error||'gagal');
     var t=label(k)+' '+nf.format(s.valid)+' valid · '+s.skipped+' dilewati';
     if(s.skippedLines&&s.skippedLines.length) t+=' (baris '+s.skippedLines.join(', ')+(s.skipped>s.skippedLines.length?', ...':'')+')';
+    if(s.info&&s.info.scanning) t+=' · memindai order';
+    if(s.info&&s.info.pending) t+=' · '+s.info.pending+' menunggu kontak';
+    if(s.info&&s.info.noPhone) t+=' · '+s.info.noPhone+' tanpa HP';
     return t+(s.stale?' · lama':'');
   });
   if(snap.state) bits.push('nomor unik '+nf.format(snap.state.totals.buyers));

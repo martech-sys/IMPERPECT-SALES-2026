@@ -30,7 +30,8 @@ function loadConfig(env) {
       dateTo: env.JUBELIO_DATE_TO,
       valueField: env.JUBELIO_VALUE_FIELD,
       includeCanceled: flag(env.JUBELIO_INCLUDE_CANCELED, false),
-      concurrency: parseInt(env.JUBELIO_CONCURRENCY || '5', 10)
+      concurrency: parseInt(env.JUBELIO_CONCURRENCY || '5', 10),
+      budgetMs: parseInt(env.JUBELIO_BUDGET_MS || '20000', 10)
     }
   };
 }
@@ -48,7 +49,7 @@ function createSources(config, log, deps) {
   if (config.sources.includes('jubelio')) {
     if (!config.jubelio.email) log('[jubelio] JUBELIO_EMAIL kosong, sumber Jubelio dilewati');
     else {
-      try { sources.push(createJubelioSource(config.jubelio)); }
+      try { sources.push(createJubelioSource(Object.assign({}, config.jubelio, deps && deps.jubelio))); }
       catch (e) { log('[jubelio] ' + e.message + ', sumber Jubelio dilewati'); }
     }
   }
