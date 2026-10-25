@@ -25,6 +25,8 @@ function createJubelioSource(cfg) {
   if (!cfg.email || !cfg.password) throw new Error('JUBELIO_EMAIL dan JUBELIO_PASSWORD wajib diisi');
   if (!locations.length && !locationIds.length) throw new Error('Isi JUBELIO_LOCATION (nama gudang) atau JUBELIO_LOCATION_ID');
   if (!cfg.dateFrom) throw new Error('Isi JUBELIO_DATE_FROM (tanggal mulai event, YYYY-MM-DD)');
+  // accept the two dates in either order
+  const [dateFrom, dateTo] = cfg.dateTo && cfg.dateTo < cfg.dateFrom ? [cfg.dateTo, cfg.dateFrom] : [cfg.dateFrom, cfg.dateTo];
 
   async function call(method, path, body, retried) {
     if (path !== '/login' && (!token || Date.now() - tokenAt > 11 * 3600e3)) {
@@ -55,8 +57,8 @@ function createJubelioSource(cfg) {
   }
 
   async function listOrders() {
-    const q = { pageSize: PAGE_SIZE, sortBy: 'transaction_date', sortDirection: 'DESC', transactionDateFrom: wib(cfg.dateFrom, '00:00:00') };
-    if (cfg.dateTo) q.transactionDateTo = wib(cfg.dateTo, '23:59:59');
+    const q = { pageSize: PAGE_SIZE, sortBy: 'transaction_date', sortDirection: 'DESC', transactionDateFrom: wib(dateFrom, '00:00:00') };
+    if (dateTo) q.transactionDateTo = wib(dateTo, '23:59:59');
     const out = [];
     for (let page = 1; ; page++) {
       const r = await call('GET', '/sales/orders/?' + new URLSearchParams(Object.assign({ page }, q)));

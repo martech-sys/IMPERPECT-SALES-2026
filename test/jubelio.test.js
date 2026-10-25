@@ -52,7 +52,7 @@ test('Jubelio source reads one location, skips canceled orders and caches detail
   const src = createJubelioSource({
     api: 'http://127.0.0.1:' + mock.srv.address().port,
     email: 'a@b.c', password: 'pw',
-    location: 'Imperfect Sales 2025', dateFrom: '2025-11-01', dateTo: '2025-11-03'
+    location: 'Imperfect Sales 2025', dateFrom: '2025-11-03', dateTo: '2025-11-01'
   });
 
   const recs = await src.fetch();
