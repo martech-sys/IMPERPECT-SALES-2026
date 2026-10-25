@@ -11,7 +11,7 @@
 /* Layout: fixed 16:9 TV stage (1rem = 1% of stage width).
    Data comes from /api/state (Postgres + Google Sheet merged on the server).
    Left: logo, total sales, tile progress bar and the four prize cards under their segments.
-   Right: Top Spender Jastiper board: #1 pinned, #2-#20 scroll in a loop.
+   Right: Top Spender Jastiper board: #1-#3 pinned, #4-#20 scroll in a loop.
    One look on purpose: orange KV, white type, read from across a room. */
 :root{
   --orange:#E2531F;
@@ -121,7 +121,10 @@ button.chip{font-family:inherit;cursor:pointer}
 .row.first .rk{color:var(--orange-deep);font-size:3rem}
 .row.first .ph{font-size:1.7rem}
 .row.first .val b{font-size:1.95rem}
-/* #2-#20 run upward in a loop inside this window only; the list is doubled while it scrolls */
+/* #1-#3 stay put above a divider; #4-#20 run upward in a loop inside this window only,
+   and the list is doubled while it scrolls */
+#rows-top{border-bottom:.2rem solid var(--cream)}
+#rows-top:has(.empty){border-bottom:0}
 .ticker{flex:1;min-height:0;overflow:hidden;
   -webkit-mask-image:linear-gradient(180deg,transparent 0,#000 1rem,#000 calc(100% - 2.4rem),transparent 100%);
   mask-image:linear-gradient(180deg,transparent 0,#000 1rem,#000 calc(100% - 2.4rem),transparent 100%)}
@@ -203,7 +206,7 @@ button.chip{font-family:inherit;cursor:pointer}
     <ol class="rows" id="rows-top"></ol>
     <div class="ticker still" id="ticker">
       <div class="track" id="track">
-        <ol class="rows" id="rows" start="2"></ol>
+        <ol class="rows" id="rows" start="4"></ol>
         <ol class="rows" id="rows-loop" aria-hidden="true" hidden></ol>
       </div>
     </div>
