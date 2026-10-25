@@ -12,7 +12,7 @@ var TIERS=[
   {at:400e6,prize:'Yamaha Aerox / Grand Filano',short:'Motor Yamaha'}
 ];
 var TOP_N=10, TILE_VALUE=10e6, TILES=40;
-var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet'};
+var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',jubelio:'Jubelio'};
 var LS_KEY='imperfect-live-state-v3';
 var reduced=false;
 try{reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}

@@ -1,13 +1,14 @@
 # Imperfect Sale 2026 — Papan TV Live
 
 Papan TV 16:9 "Top Spender Jastiper": total belanja terbesar per nomor HP, progres level hadiah
-(100 / 200 / 300 / 400 mio) dan top 10 jastiper. Data dibaca dari **Postgres** dan **Google Sheet**,
+(100 / 200 / 300 / 400 mio) dan top 10 jastiper. Data dibaca dari **Postgres**, **Google Sheet** dan
+**Jubelio** (order dari satu gudang/lokasi),
 digabung per nomor HP di server, lalu halaman TV polling `/api/state`.
 
 ```
 Postgres ─┐
-          ├─► server (Node) ─ gabung per nomor HP ─► /api/state ─► public/index.html (TV)
- Sheet  ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
+ Sheet  ──┼─► server (Node) ─ gabung per nomor HP ─► /api/state ─► public/index.html (TV)
+Jubelio ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
 ```
 
 - Nomor `0812…`, `62812…`, `+62 812…` dianggap nomor yang sama, dari sumber mana pun.
@@ -60,7 +61,11 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 | `PG_SSL` | `false` | `true` untuk DB terkelola (Supabase, RDS, Neon, dll). |
 | `SHEET_URL` | – | Link Sheet (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. Kosong = sumber Sheet dilewati. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
-| `DATA_SOURCES` | `postgres,sheet` | Batasi sumber, mis. `postgres` saja. |
+| `DATA_SOURCES` | `postgres,sheet,jubelio` | Batasi sumber, mis. `jubelio` saja. |
+| `JUBELIO_EMAIL`, `JUBELIO_PASSWORD` | – | Login API Jubelio. Kosong = sumber Jubelio dilewati. |
+| `JUBELIO_LOCATION` / `JUBELIO_LOCATION_ID` | – | Gudang yang dibaca, mis. `Imperfect Sales 2025`. |
+| `JUBELIO_DATE_FROM`, `JUBELIO_DATE_TO` | – / tanpa batas | Rentang tanggal transaksi event (WIB, `YYYY-MM-DD`). `FROM` wajib. |
+| `JUBELIO_VALUE_FIELD` | `grand_total` | Kolom nilai dari detail order, mis. `sub_total`. |
 | `POLL_MS` | `30000` | Interval baca ulang di server Node, sekaligus interval polling halaman TV (min 5000). |
 | `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN. |
 | `PORT` | `3000` | Port HTTP. |
@@ -80,6 +85,22 @@ Atau arahkan ke tabel yang sudah ada lewat `PG_QUERY`, contoh:
 SELECT no_hp AS phone, nama AS name, jumlah AS qty, total AS value
 FROM penjualan WHERE event = 'imperfect-2026'
 ```
+
+### Jubelio
+
+Sumber ini hanya **membaca**: `POST /login` untuk token, sisanya `GET`. Perilaku API mengikuti catatan
+yang sudah diverifikasi di `martech-sys/data-db` (`docs/jubelio-api.md`).
+
+1. `GET /sales/orders/` dengan `transactionDateFrom`/`To` dari `JUBELIO_DATE_FROM`/`JUBELIO_DATE_TO` (WIB),
+   lalu disaring ke gudang `JUBELIO_LOCATION` (nama, tidak peka huruf besar/kecil) atau `JUBELIO_LOCATION_ID`.
+   Order batal dilewati kecuali `JUBELIO_INCLUDE_CANCELED=true`.
+2. Nomor HP dan item hanya ada di detail order, jadi tiap order dibaca dengan `GET /sales/orders/{id}`
+   (±1 detik per order, 5 paralel). Detail disimpan di memori dan hanya dibaca ulang kalau
+   `last_modified` order berubah.
+3. HP = `customer_phone`, atau `shipping_phone` bila kosong. Nama = `customer_name`.
+   Qty = jumlah `qty_in_base` item yang tidak dibatalkan. Nilai = `grand_total` (atau `JUBELIO_VALUE_FIELD`).
+
+Kredensial Jubelio cukup di `.env` / environment variables hosting. Jangan di-commit.
 
 ### Google Sheet
 
