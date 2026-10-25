@@ -19,6 +19,7 @@ function createCollector(sources, opts) {
       const records = await src.fetch();
       last.set(src.name, { records, fetchedAt: new Date().toISOString() });
       st.ok = true; st.error = null;
+      if (src.info) st.info = src.info(); // e.g. Jubelio sync progress for the #cek chip
     } catch (e) {
       st.ok = false; st.error = e.message || String(e);
       console.error('[' + src.name + '] ' + st.error);

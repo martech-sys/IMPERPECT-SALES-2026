@@ -4,6 +4,7 @@
    good data per source); results are also cached on Netlify's CDN for
    CACHE_SECONDS so many TVs polling at once do not each hit Postgres. */
 import pg from 'pg';
+import { getStore } from '@netlify/blobs';
 import collectorMod from '../../server/collector.js';
 import configMod from '../../server/config.js';
 
@@ -12,7 +13,17 @@ const { loadConfig, createSources } = configMod;
 
 const env = process.env;
 const settings = loadConfig(env);
-const sources = createSources(settings, console.warn, { Pool: pg.Pool });
+// Jubelio sync progress lives in Netlify Blobs, so a cold instance carries on
+// where the last one stopped instead of re-reading every order and contact.
+// Each request gets a short budget; the CDN cache spaces requests out.
+const jubelioStore = {
+  load: () => getStore({ name: 'imperfect-jubelio', consistency: 'strong' }).get('sync', { type: 'json' }),
+  save: (s) => getStore({ name: 'imperfect-jubelio', consistency: 'strong' }).setJSON('sync', s)
+};
+const sources = createSources(settings, console.warn, {
+  Pool: pg.Pool,
+  jubelio: { store: jubelioStore, budgetMs: parseInt(env.JUBELIO_BUDGET_MS || '7000', 10) }
+});
 const collector = sources.length ? createCollector(sources, { pollMs: settings.pollMs }) : null;
 const cacheSeconds = Math.max(0, parseInt(env.CACHE_SECONDS || '15', 10));
 let lastRefresh = 0;

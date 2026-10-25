@@ -11,8 +11,9 @@ var TIERS=[
   {at:300e6,prize:'iPhone 16',short:'iPhone 16'},
   {at:400e6,prize:'Yamaha Aerox / Grand Filano',short:'Motor Yamaha'}
 ];
-var TOP_N=10, TILE_VALUE=10e6, TILES=40;
-var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet'};
+var TOP_N=20, TILE_VALUE=10e6, TILES=40;
+var TICK_SEC_PER_ROW=2.4; // scroll speed of the board: seconds per row
+var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',jubelio:'Jubelio'};
 var LS_KEY='imperfect-live-state-v3';
 var reduced=false;
 try{reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
@@ -132,10 +133,10 @@ function render(s){
     tt.appendChild(document.createTextNode('.'));
   }
 
-  var rows=$('rows');rows.textContent='';
+  var head=$('rows-top'),rows=$('rows');head.textContent='';rows.textContent='';
   var show=top.slice(0,TOP_N);
   if(!show.length){
-    rows.appendChild(el('li','empty','Belum ada transaksi. Jadi yang pertama masuk papan ini.'));
+    head.appendChild(el('li','empty','Belum ada transaksi. Jadi yang pertama masuk papan ini.'));
   }
   show.forEach(function(r,i){
     var u=tierIdx(r.v),floor=u>=0?TIERS[u].at:0,nxt=TIERS[u+1];
@@ -151,14 +152,43 @@ function render(s){
     val.appendChild(el('b',null,money(r.v)));
     val.appendChild(el('small',null,u>=0?'Dapat '+TIERS[u].short:Math.floor(pct)+'% ke '+TIERS[0].short));
     li.appendChild(val);
-    rows.appendChild(li);
+    (i===0?head:rows).appendChild(li);
   });
+  layoutTicker();
 
   var isSample=!!s.sample;
   $('chip-live').hidden=isSample;
   if(!isSample&&s.updatedAt) $('live-text').textContent='Live · update '+clock(s.updatedAt);
   note.textContent='Data contoh';note.hidden=!isSample;act.hidden=true;
 }
+/* ---------- board ticker: #2-#20 scroll upward in a loop ---------- */
+/* Driven by requestAnimationFrame with the offset kept across renders, so a
+   data refresh every poll does not make the list jump back to the top. */
+var tick={off:0,half:0,last:0,raf:0};
+function layoutTicker(){
+  var box=$('ticker'),list=$('rows'),loop=$('rows-loop');
+  loop.textContent='';loop.hidden=true;
+  var over=!reduced&&list.children.length>0&&list.offsetHeight>box.clientHeight+1;
+  box.classList.toggle('still',!over);
+  if(!over){cancelAnimationFrame(tick.raf);tick.raf=0;tick.off=0;$('track').style.transform='';return;}
+  // second copy right under the first, so the end flows straight back into #2
+  loop.innerHTML=list.innerHTML;loop.hidden=false;
+  tick.half=list.offsetHeight;
+  tick.off%=tick.half;
+  if(!tick.raf){tick.last=0;tick.raf=requestAnimationFrame(step);}
+}
+function step(t){
+  var list=$('rows'),row=list.firstElementChild;
+  if(tick.last&&row){
+    var dt=Math.min(100,t-tick.last); // a hidden tab resumes where it was
+    tick.off=(tick.off+dt/1000*row.offsetHeight/TICK_SEC_PER_ROW)%tick.half;
+    $('track').style.transform='translateY('+(-tick.off).toFixed(2)+'px)';
+  }
+  tick.last=t;tick.raf=requestAnimationFrame(step);
+}
+var resizeT=0;
+window.addEventListener('resize',function(){clearTimeout(resizeT);resizeT=setTimeout(layoutTicker,150);});
+
 function showNote(text,actionLabel,fn){
   note.textContent=text;note.hidden=false;
   if(actionLabel){act.textContent=actionLabel;act.hidden=false;act.onclick=fn;}else{act.hidden=true;act.onclick=null;}
@@ -188,6 +218,9 @@ function showDiag(snap){
     if(!s.ok&&!s.stale) return label(k)+': '+(s.error||'gagal');
     var t=label(k)+' '+nf.format(s.valid)+' valid · '+s.skipped+' dilewati';
     if(s.skippedLines&&s.skippedLines.length) t+=' (baris '+s.skippedLines.join(', ')+(s.skipped>s.skippedLines.length?', ...':'')+')';
+    if(s.info&&s.info.scanning) t+=' · memindai order';
+    if(s.info&&s.info.pending) t+=' · '+s.info.pending+' menunggu kontak';
+    if(s.info&&s.info.noPhone) t+=' · '+s.info.noPhone+' tanpa HP';
     return t+(s.stale?' · lama':'');
   });
   if(snap.state) bits.push('nomor unik '+nf.format(snap.state.totals.buyers));
