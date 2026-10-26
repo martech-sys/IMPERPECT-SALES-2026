@@ -11,7 +11,7 @@ function createPostgresSource(cfg) {
   const pool = new Pool({
     connectionString: cfg.url,
     ssl: cfg.ssl ? { rejectUnauthorized: cfg.sslRejectUnauthorized } : undefined,
-    max: 2,
+    max: cfg.maxConnections || 2,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
     statement_timeout: 20000

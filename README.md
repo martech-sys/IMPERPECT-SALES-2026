@@ -68,7 +68,7 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 | `JUBELIO_VALUE_FIELD` | `grand_total` | Kolom nilai dari detail order, mis. `sub_total`. |
 | `JUBELIO_BUDGET_MS` | `20000` (Netlify `7000`) | Batas waktu sinkron Jubelio per pembacaan. |
 | `POLL_MS` | `30000` | Interval baca ulang di server Node, sekaligus interval polling halaman TV (min 5000). |
-| `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN. |
+| `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN (= jarak minimum antar query). |
 | `PORT` | `3000` | Port HTTP. |
 
 ### Postgres (warehouse `we_data_store`) — sumber event 2026
@@ -102,6 +102,30 @@ punya `no_hp`, status apa yang perlu dibuang (batal/retur), dan seberapa cepat t
 ```bash
 psql "$DATABASE_URL" -f scripts/cek-event-postgres.sql
 ```
+
+#### Beban ke database
+
+Papan dirancang agar **jumlah TV tidak menambah beban database**:
+
+- **Satu query per interval, berapa pun TV-nya.** TV membaca `/api/state`, bukan database. Server Node
+  menjalankan `PG_QUERY` sekali tiap `POLL_MS`; di Netlify hasilnya di-cache di CDN selama
+  `CACHE_SECONDS`, jadi function (dan query) jalan paling sering sekali per interval itu.
+- **Koneksi sedikit dan dipakai ulang.** Server Node memakai pool maksimal 2 koneksi, Netlify Function
+  maksimal 1 per instance; koneksi menganggur ditutup setelah 30 detik. Query dibatasi 20 detik
+  (`statement_timeout`).
+- **Hanya hasil agregat yang dikirim**: satu baris per invoice untuk 3 hari event, bukan seluruh tabel.
+
+Yang perlu dipastikan adalah **query-nya memakai index**. `laporan_penjualan` besar; kalau penyaringnya
+tidak ter-index, Postgres membaca seluruh tabel setiap poll. Bagian 6–7 skrip cek menampilkan index
+yang ada dan rencana eksekusi query papan:
+
+- Index yang dipakai OFFLINE-STORE adalah `(sumber, channel, tanggal)`. Kalau event tercatat sebagai
+  satu `channel` di `sumber = 'OFFLINE-STORE'`, saring dengan
+  `sumber = 'OFFLINE-STORE' AND channel = '...' AND tanggal ...` agar index itu terpakai.
+- Kalau event hanya bisa disaring lewat `warehouse`, minta DBA membuat index
+  `(warehouse, tanggal)`, atau naikkan interval.
+- Interval wajar: `POLL_MS=60000` dan `CACHE_SECONDS=30`. Kalau `laporan_penjualan` sendiri diisi
+  berkala (mis. tiap 30 menit), poll lebih cepat dari itu tidak menambah kesegaran, hanya beban.
 
 Untuk tabel lain, cukup ganti `PG_QUERY`; kolom yang dibutuhkan selalu `phone, name, qty, value`.
 Tabel contoh untuk uji lokal ada di `db/schema.sql` + `db/seed.sql` (`npm run db:init`, `npm run db:seed`).

@@ -65,3 +65,18 @@ SELECT sumber, MAX(tanggal) AS tanggal_terakhir,
  WHERE tanggal >= CURRENT_DATE - 3
  GROUP BY sumber
  ORDER BY tanggal_terakhir DESC;
+
+\echo '== 6. Index yang ada di laporan_penjualan =='
+SELECT indexname, indexdef
+  FROM pg_indexes
+ WHERE tablename = 'laporan_penjualan'
+ ORDER BY indexname;
+
+\echo '== 7. Rencana eksekusi query papan (EXPLAIN saja, query tidak dijalankan) =='
+\echo '   Cari "Index Scan"/"Bitmap Index Scan". "Seq Scan on laporan_penjualan" berarti seluruh tabel dibaca tiap poll.'
+EXPLAIN
+SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar) AS value
+  FROM laporan_penjualan
+ WHERE warehouse = 'MAIN IMPERFECT WAREHOUS 2026'
+   AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
+ GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order);
