@@ -5,7 +5,7 @@ const { createSheetSource } = require('./sources/sheet');
 const { createJubelioSource } = require('./sources/jubelio');
 
 /* One place that turns environment variables into sources, shared by the
-   long-running server (server/index.js) and the Netlify Function. */
+   long-running server (server/index.js) and the Vercel Function (server/api.js). */
 const flag = (v, d) => (v == null || v === '' ? d : /^(1|true|yes|on)$/i.test(v));
 
 function loadConfig(env) {
