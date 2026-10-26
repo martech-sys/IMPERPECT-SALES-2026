@@ -21,7 +21,7 @@ function sheetCsvUrl(src, defaultGid) {
 function createSheetSource(cfg) {
   const url = sheetCsvUrl(cfg.url, cfg.gid);
   return {
-    name: 'sheet',
+    name: cfg.name || 'sheet',
     url,
     async fetch() {
       const res = await fetch(url, { cache: 'no-store', redirect: 'follow', signal: AbortSignal.timeout(15000) });

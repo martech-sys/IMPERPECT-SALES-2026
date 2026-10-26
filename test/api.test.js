@@ -66,3 +66,30 @@ test('Vercel function without any source says which variables it received, never
   assert.match(r.body.skipped[0], /DATABASE_URL \/ DATABASE_HOST kosong/);
   assert.ok(!stdout.includes('rahasia#123'), 'password value never appears');
 });
+
+test('brand sheets: one missing or private sheet does not stop the others', async (t) => {
+  const srv = http.createServer((req, res) => {
+    if (req.url.startsWith('/heymale')) { res.writeHead(200, { 'Content-Type': 'text/csv' }); return res.end('No HP,Nama,qty,trx value\n081234567890,Dewi,1,2000000\n'); }
+    if (req.url.startsWith('/private')) { res.writeHead(200, { 'Content-Type': 'text/html' }); return res.end('<!DOCTYPE html><html>login</html>'); }
+    res.writeHead(404); res.end();
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  t.after(() => srv.close());
+  const base = 'http://127.0.0.1:' + srv.address().port;
+
+  const { results: [state, health] } = await callVercel({
+    DATA_SOURCES: 'sheet',
+    SHEET_URL: base + '/heymale?output=csv',
+    SHEET_URLS: ['Heymale | ' + base + '/heymale?output=csv', 'Zoma | ' + base + '/belum-ada?output=csv', 'Boonaboo | ' + base + '/private?output=csv'].join('\n')
+  }, ['/api/state', '/healthz']);
+
+  const src = state.body.sources;
+  assert.deepEqual(Object.keys(src).sort(), ['sheet', 'sheet:Boonaboo', 'sheet:Heymale', 'sheet:Zoma']);
+  assert.equal(src['sheet:Heymale'].ok, true);
+  assert.equal(src['sheet:Zoma'].ok, false);
+  assert.match(src['sheet:Zoma'].error, /HTTP 404/);
+  assert.match(src['sheet:Boonaboo'].error, /tidak publik/);
+  // same buyer in SHEET_URL and the Heymale sheet: merged by phone into one row
+  assert.deepEqual(state.body.state.top, [{ p: '0812-xxxx-7890', n: 'Dewi', q: 2, t: 2, v: 4000000 }]);
+  assert.equal(health.status, 200, 'board stays up while some brand sheets fail');
+});

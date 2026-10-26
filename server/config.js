@@ -25,6 +25,7 @@ function loadConfig(env) {
       sslRejectUnauthorized: flag(env.PG_SSL_REJECT_UNAUTHORIZED, true)
     },
     sheet: { url: env.SHEET_URL, gid: env.SHEET_GID || '0' },
+    brandSheets: parseBrandSheets(env.SHEET_URLS),
     jubelio: {
       email: env.JUBELIO_EMAIL,
       password: env.JUBELIO_PASSWORD,
@@ -48,7 +49,16 @@ function createSources(config, log, deps) {
   }
   if (config.sources.includes('sheet')) {
     if (config.sheet.url) sources.push(createSheetSource(config.sheet));
-    else log('[sheet] SHEET_URL kosong, sumber Sheet dilewati');
+    // one source per brand, so a brand sheet that is missing or broken only
+    // flags that brand; the others keep feeding the board
+    const seen = new Set();
+    config.brandSheets.forEach((b) => {
+      const name = 'sheet:' + b.brand;
+      if (seen.has(name)) { log('[' + name + '] brand ini tertulis dua kali di SHEET_URLS, yang kedua dilewati'); return; }
+      seen.add(name);
+      sources.push(createSheetSource({ name, url: b.url, gid: config.sheet.gid }));
+    });
+    if (!config.sheet.url && !config.brandSheets.length) log('[sheet] SHEET_URL / SHEET_URLS kosong, sumber Sheet dilewati');
   }
   if (config.sources.includes('jubelio')) {
     if (!config.jubelio.email) log('[jubelio] JUBELIO_EMAIL kosong, sumber Jubelio dilewati');
@@ -60,4 +70,18 @@ function createSources(config, log, deps) {
   return sources;
 }
 
-module.exports = { loadConfig, createSources };
+/* SHEET_URLS: one brand per line (or separated by ";"), as "Brand | link".
+   A line without "|" gets the name "Sheet N". Blank lines and lines starting
+   with # are ignored. */
+function parseBrandSheets(text) {
+  return String(text || '').split(/[\n;]+/).map((l) => l.trim()).filter((l) => l && l[0] !== '#')
+    .map((line, i) => {
+      const bar = line.indexOf('|');
+      const brand = bar < 0 ? 'Sheet ' + (i + 1) : line.slice(0, bar).trim().replace(/\s+/g, ' ');
+      const url = (bar < 0 ? line : line.slice(bar + 1)).trim();
+      return { brand: brand || 'Sheet ' + (i + 1), url };
+    })
+    .filter((b) => b.url);
+}
+
+module.exports = { loadConfig, createSources, parseBrandSheets };

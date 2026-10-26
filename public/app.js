@@ -2,20 +2,12 @@
 'use strict';
 
 /* ---------- config ---------- */
-/* Data dibaca server dari Postgres + Google Sheet, lalu digabung per nomor HP.
-   Halaman ini cukup polling /api/state. Tambahkan #cek di URL untuk diagnostik. */
+/* Data dibaca server dari Postgres (warehouse) + Sheet per brand, lalu digabung per
+   nomor HP. Halaman ini cukup polling /api/state. Tambahkan #cek di URL untuk diagnostik. */
 var API='api/state';
-var TIERS=[
-  {at:100e6,prize:'Apple Watch Series 10',short:'Apple Watch'},
-  {at:200e6,prize:'LG 400L Multi Door Inverter',short:'LG 400L'},
-  {at:300e6,prize:'iPhone 16',short:'iPhone 16'},
-  {at:400e6,prize:'Yamaha Aerox / Grand Filano',short:'Motor Yamaha'}
-];
-var TOP_N=20, TILE_VALUE=10e6, TILES=40;
-var PINNED=3; // ranks that stay fixed at the top of the board; the rest scroll
-var TICK_SEC_PER_ROW=2.4; // scroll speed of the board: seconds per row
+var STORE_LS=1500, SPEED=3.4, DWELL=4;  /* SPEED = rem per detik, DWELL = detik berhenti di peringkat 1 */
 var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',jubelio:'Jubelio'};
-var LS_KEY='imperfect-live-state-v3';
+var LS_KEY='imperfect-live-state-v4';
 var reduced=false;
 try{reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
 
@@ -60,136 +52,112 @@ function sampleState(){
     top.push(j);
   }
   top.sort(function(a,b){return b.v-a.v;});
-  return {sample:true,updatedAt:null,top:top.slice(0,30)};
+  return {sample:true,updatedAt:null,top:top};
 }
 
-/* ---------- static DOM: tiles and cards ---------- */
-var tiles=[],cardEls=[];
-(function build(){
-  var bar=$('bar'),cards=$('cards');
-  TIERS.forEach(function(tier){
-    var seg=el('div','seg');
-    for(var i=0;i<TILES/TIERS.length;i++){var tl=el('i','tile');seg.appendChild(tl);tiles.push(tl);}
-    bar.appendChild(seg);
-    var c=el('div','card locked');
-    c.appendChild(el('div','at',(tier.at/1e6)+' mio'));
-    c.appendChild(el('div','prize',tier.prize));
-    var st=el('div','state','Terkunci');c.appendChild(st);
-    cards.appendChild(c);cardEls.push({root:c,state:st});
-  });
-})();
-
-/* ---------- render ---------- */
-var shown=0,raf=0,current=null;
+/* ---------- render: dua kolom ranking yang bergerak ---------- */
 var note=$('chip-sample'),act=$('chip-action'),diagChip=$('chip-diag');
-function paintHero(v){var p=parts(v);$('hero-num').textContent=p.n;$('hero-unit').textContent=p.u==='k'?'rb':p.u;$('hero-unit').hidden=!p.u;}
-function animateTo(target){
-  cancelAnimationFrame(raf);
-  var from=shown,t0=performance.now(),dur=reduced?0:1100;
-  function step(t){
-    var k=dur?Math.min(1,(t-t0)/dur):1,e=1-Math.pow(1-k,3);
-    shown=from+(target-from)*e;paintHero(shown);
-    if(k<1) raf=requestAnimationFrame(step);
-  }
-  raf=requestAnimationFrame(step);
+var colB=$('col-b'),trkA=$('trk-a'),trkB=$('trk-b');
+var current=null,lastSig='';
+var mobile=false;
+try{mobile=window.matchMedia('(max-width:900px)').matches;}catch(e){}
+function remPx(){return parseFloat(getComputedStyle(document.documentElement).fontSize)||16;}
+function rowEl(r,rank){
+  var li=el('div','row'+(rank<=3?' top':'')+(rank===1?' r1':''));
+  li.appendChild(el('span','rk',String(rank)));
+  var who=el('span','who');
+  who.appendChild(el('span','ph',r.p));
+  who.appendChild(el('span','nm',r.n||'Pelanggan'));
+  li.appendChild(who);
+  var val=el('span','val');
+  val.appendChild(el('b',null,money(r.v)));
+  val.appendChild(el('small',null,r.t+' trx · '+r.q+' pcs'));
+  li.appendChild(val);
+  return li;
 }
-function tierIdx(v){var u=-1;TIERS.forEach(function(x,i){if(v>=x.at)u=i;});return u;}
+/* satu aliran: kolom kiri = jendela awal, kolom kanan = lanjutan persis di bawahnya.
+   Baris yang keluar di atas kolom kanan masuk ke bawah kolom kiri, satu irama. */
+var flow={on:false,o:0,hold:DWELL,L:0,H:0};
+var lastT=0,vel=0,remC=remPx(),RAMP=1.6;
+function fillStatic(trk,list,startRank){
+  trk.textContent='';trk.style.transform='';
+  list.forEach(function(r,i){trk.appendChild(rowEl(r,startRank+i));});
+}
+function layout(top){
+  var rem=remPx(),lists=$('lists'),H=lists.clientHeight;remC=rem;
+  var cap=mobile?1e9:Math.max(1,Math.floor(H/(4.6*rem))),n=top.length;
+  flow.on=false;
+  if(mobile){fillStatic(trkA,top,1);trkB.textContent='';colB.hidden=true;return;}
+  colB.hidden=false;
+  var rowPx=H/cap;
+  lists.style.setProperty('--rowh',(rowPx/rem).toFixed(3)+'rem');
+  if(n<=cap*2||reduced){
+    var k=Math.min(n,cap);
+    fillStatic(trkA,top.slice(0,k),1);
+    fillStatic(trkB,top.slice(k,k*2),k+1);
+    return;
+  }
+  var GAP=2,pass,i;
+  [trkA,trkB].forEach(function(t){
+    t.textContent='';
+    for(pass=0;pass<2;pass++){
+      for(i=0;i<n;i++) t.appendChild(rowEl(top[i],i+1));
+      for(i=0;i<GAP;i++) t.appendChild(el('div','row spacer'));
+    }
+  });
+  flow.L=(n+GAP)*rowPx;flow.H=H;flow.on=true;
+  if(flow.o>=flow.L){flow.o=0;flow.hold=DWELL;}
+}
+/* gerak halus: kecepatan naik-turun pelan (ease) saat mulai dan saat berhenti di peringkat 1,
+   posisi sub-piksel di layer GPU supaya tidak patah-patah */
+function tick(t){
+  var dt=lastT?Math.min(.05,(t-lastT)/1000):0;lastT=t;
+  if(flow.on&&dt>0){
+    var vmax=SPEED*remC,acc=vmax/RAMP;
+    if(flow.hold>0){flow.hold-=dt;vel=0;}
+    else{
+      var left=flow.L-flow.o;
+      var brake=Math.sqrt(2*acc*Math.max(0,left));
+      vel=Math.min(vmax,vel+acc*dt,brake);
+      if(vel<1e-3&&left<.5){flow.o=0;flow.hold=DWELL;vel=0;}
+      else{flow.o+=vel*dt;if(flow.o>=flow.L-.25){flow.o=0;flow.hold=DWELL;vel=0;}}
+    }
+    var oa=flow.o%flow.L,ob=(flow.o+flow.H)%flow.L;
+    trkA.style.transform='translate3d(0,'+(-oa).toFixed(2)+'px,0)';
+    trkB.style.transform='translate3d(0,'+(-ob).toFixed(2)+'px,0)';
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+var rzT=0;
+window.addEventListener('resize',function(){clearTimeout(rzT);rzT=setTimeout(function(){
+  try{mobile=window.matchMedia('(max-width:900px)').matches;}catch(e){}
+  if(current){lastSig='';render(current);}
+},200);});
+
 function render(s){
   current=s;
   var top=s.top||[];
-  var lead=top[0],leadV=lead?lead.v:0;
+  var lead=top[0];
+  $('champ-v').textContent=lead?money(lead.v):'Rp 0';
+  $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Belum ada transaksi';
+  $('board-sub').textContent='Belanja terbesar per nomor HP · '+nf.format(top.length)+' jastiper';
 
-  animateTo(leadV);
-
-  tiles.forEach(function(tl,k){
-    var f=Math.max(0,Math.min(1,leadV/TILE_VALUE-k));
-    tl.style.setProperty('--f',(f*100).toFixed(1)+'%');
-  });
-
-  var nextIdx=-1;
-  TIERS.forEach(function(tier,i){
-    var c=cardEls[i];
-    var n=top.filter(function(r){return tierIdx(r.v)===i;}).length,open=n>0,reached=leadV>=tier.at;
-    if(!reached&&nextIdx<0) nextIdx=i;
-    c.root.className='card '+(open?'open':(i===nextIdx?'next':'locked'));
-    c.state.textContent=open?(n+' jastiper dapat ini'):(reached?'Belum ada jastiper':i===nextIdx?'Tinggal '+money(tier.at-leadV):'Terkunci');
-  });
-
-  var tt=$('target-text');tt.textContent='';
-  if(!lead){
-    tt.appendChild(document.createTextNode('Belanja '));
-    tt.appendChild(el('b',null,money(TIERS[0].at)));
-    tt.appendChild(document.createTextNode(' dalam satu nomor HP untuk dapat '));
-    tt.appendChild(el('b',null,TIERS[0].prize));
-    tt.appendChild(document.createTextNode('.'));
-  }else if(nextIdx<0){
-    tt.appendChild(el('b',null,'Level tertinggi sudah tercapai.'));
-    tt.appendChild(document.createTextNode(' Tiap jastiper dapat 1 hadiah sesuai levelnya.'));
-  }else{
-    tt.appendChild(el('b',null,lead.p));
-    tt.appendChild(document.createTextNode(' tinggal '));
-    tt.appendChild(el('b',null,money(TIERS[nextIdx].at-leadV)));
-    tt.appendChild(document.createTextNode(' lagi untuk '));
-    tt.appendChild(el('b',null,TIERS[nextIdx].prize));
-    tt.appendChild(document.createTextNode('.'));
+  // rebuild the columns only when the ranking changed, so a poll does not restart the scroll
+  var sig=top.length+'|'+top.map(function(r){return r.p+':'+r.v+':'+r.t;}).join(',');
+  if(sig!==lastSig){
+    lastSig=sig;
+    if(!top.length){
+      trkB.textContent='';flow.on=false;trkA.textContent='';
+      trkA.appendChild(el('div','empty','Belum ada transaksi. Jadi yang pertama masuk papan ini.'));
+    }else layout(top);
   }
-
-  var head=$('rows-top'),rows=$('rows');head.textContent='';rows.textContent='';
-  var show=top.slice(0,TOP_N);
-  if(!show.length){
-    head.appendChild(el('li','empty','Belum ada transaksi. Jadi yang pertama masuk papan ini.'));
-  }
-  show.forEach(function(r,i){
-    var u=tierIdx(r.v),floor=u>=0?TIERS[u].at:0,nxt=TIERS[u+1];
-    var pct=nxt?Math.max(0,Math.min(100,(r.v-floor)/(nxt.at-floor)*100)):100;
-    var li=el('li','row'+(i===0?' first':'')+(u>=0?' got':''));
-    li.style.setProperty('--p',pct.toFixed(1)+'%');
-    li.appendChild(el('span','rk',String(i+1)));
-    var who=el('span','who');
-    who.appendChild(el('span','ph',r.p));
-    who.appendChild(el('span','nm',r.n||'Pelanggan'));
-    li.appendChild(who);
-    var val=el('span','val');
-    val.appendChild(el('b',null,money(r.v)));
-    val.appendChild(el('small',null,u>=0?'Dapat '+TIERS[u].short:Math.floor(pct)+'% ke '+TIERS[0].short));
-    li.appendChild(val);
-    (i<PINNED?head:rows).appendChild(li);
-  });
-  layoutTicker();
 
   var isSample=!!s.sample;
   $('chip-live').hidden=isSample;
   if(!isSample&&s.updatedAt) $('live-text').textContent='Live · update '+clock(s.updatedAt);
   note.textContent='Data contoh';note.hidden=!isSample;act.hidden=true;
 }
-/* ---------- board ticker: #4-#20 scroll upward in a loop ---------- */
-/* Driven by requestAnimationFrame with the offset kept across renders, so a
-   data refresh every poll does not make the list jump back to the top. */
-var tick={off:0,half:0,last:0,raf:0};
-function layoutTicker(){
-  var box=$('ticker'),list=$('rows'),loop=$('rows-loop');
-  loop.textContent='';loop.hidden=true;
-  var over=!reduced&&list.children.length>0&&list.offsetHeight>box.clientHeight+1;
-  box.classList.toggle('still',!over);
-  if(!over){cancelAnimationFrame(tick.raf);tick.raf=0;tick.off=0;$('track').style.transform='';return;}
-  // second copy right under the first, so the end flows straight back into #2
-  loop.innerHTML=list.innerHTML;loop.hidden=false;
-  tick.half=list.offsetHeight;
-  tick.off%=tick.half;
-  if(!tick.raf){tick.last=0;tick.raf=requestAnimationFrame(step);}
-}
-function step(t){
-  var list=$('rows'),row=list.firstElementChild;
-  if(tick.last&&row){
-    var dt=Math.min(100,t-tick.last); // a hidden tab resumes where it was
-    tick.off=(tick.off+dt/1000*row.offsetHeight/TICK_SEC_PER_ROW)%tick.half;
-    $('track').style.transform='translateY('+(-tick.off).toFixed(2)+'px)';
-  }
-  tick.last=t;tick.raf=requestAnimationFrame(step);
-}
-var resizeT=0;
-window.addEventListener('resize',function(){clearTimeout(resizeT);resizeT=setTimeout(layoutTicker,150);});
-
 function showNote(text,actionLabel,fn){
   note.textContent=text;note.hidden=false;
   if(actionLabel){act.textContent=actionLabel;act.hidden=false;act.onclick=fn;}else{act.hidden=true;act.onclick=null;}
@@ -197,7 +165,7 @@ function showNote(text,actionLabel,fn){
 
 /* ---------- storage: last good state, per browser ---------- */
 function loadLocal(){try{var r=localStorage.getItem(LS_KEY);return r?JSON.parse(r):null;}catch(e){return null;}}
-function saveLocal(s){try{localStorage.setItem(LS_KEY,JSON.stringify(s));}catch(e){}}
+function saveLocal(s){try{var c={};for(var k in s)c[k]=s[k];c.top=(s.top||[]).slice(0,STORE_LS);localStorage.setItem(LS_KEY,JSON.stringify(c));}catch(e){}}
 
 /* ---------- status + diagnostics ---------- */
 function stamp(iso){
@@ -206,12 +174,7 @@ function stamp(iso){
     $('lastup-t').textContent=f+' WIB';
   }catch(e){}
 }
-function label(name){return SOURCE_LABEL[name]||name;}
-function sourceNote(sources){
-  var bad=Object.keys(sources||{}).filter(function(k){return !sources[k].ok;});
-  if(!bad.length) return '';
-  return bad.map(label).join(' & ')+' gagal dibaca. Menampilkan data terakhir.';
-}
+function label(name){return SOURCE_LABEL[name]||(name.indexOf('sheet:')===0?'Sheet '+name.slice(6):name);}
 function showDiag(snap){
   if(location.hash!=='#cek'){diagChip.hidden=true;return;}
   var src=snap.sources||{},bits=Object.keys(src).map(function(k){
@@ -229,14 +192,16 @@ function showDiag(snap){
 }
 
 /* ---------- polling ---------- */
+/* Source problems (a brand Sheet missing, the database down) are not shown to the
+   audience: the board keeps the last data it has. The team sees them on #cek and /healthz. */
 var failed=0,pollMs=30000;
 function onSnapshot(snap){
   failed=0;
   if(snap.pollMs) pollMs=Math.max(5000,snap.pollMs);
-  var st=snap.state,warn=sourceNote(snap.sources);
+  var st=snap.state;
   if(!st){
     if(!current||current.sample) render(sampleState());
-    showNote(warn||'Menunggu data pertama dari server...');
+    showNote('Menunggu data pertama dari server...');
   }else if(!st.top.length){
     render(sampleState());
     showNote('Belum ada transaksi. Menampilkan data contoh.');
@@ -245,7 +210,6 @@ function onSnapshot(snap){
     saveLocal(st);
     render(st);
     stamp(st.updatedAt);
-    if(warn) showNote(warn);
   }
   showDiag(snap);
 }

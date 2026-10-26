@@ -1,8 +1,9 @@
 # Imperfect Sale 2026 — Papan TV Live
 
-Papan TV 16:9 "Top Spender Jastiper": total belanja terbesar per nomor HP, progres level hadiah
-(100 / 200 / 300 / 400 mio) dan top 20 jastiper. Data dibaca dari **Postgres**, **Google Sheet** dan
-**Jubelio** (order dari satu gudang/lokasi),
+Papan TV 16:9 "Ranking Jastiper": **semua jastiper** diurutkan dari belanja terbesar per nomor HP, dalam
+dua kolom yang mengalir sebagai satu daftar (kolom kanan melanjutkan kolom kiri, berhenti sejenak di
+peringkat 1), plus "Juara sementara" di kanan atas. Data dibaca dari **Postgres** (warehouse),
+**Google Sheet per brand** dan opsional **Jubelio**,
 digabung per nomor HP di server, lalu halaman TV polling `/api/state`.
 
 ```
@@ -14,14 +15,14 @@ Jubelio ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
 - Nomor `0812…`, `62812…`, `+62 812…` dianggap nomor yang sama, dari sumber mana pun.
 - Nomor HP disamarkan (`0812-xxxx-7890`) di server; nomor lengkap tidak pernah dikirim ke browser.
 - Kalau satu sumber gagal (DB restart, Sheet tidak bisa dibuka), papan tetap memakai data terakhir
-  dari sumber itu dan menampilkan peringatan di layar.
+  dari sumber itu tanpa menampilkan peringatan ke penonton; statusnya terlihat di `#cek` dan `/healthz`.
 
 ## Menjalankan
 
 Butuh Node.js 20.12+.
 
 ```bash
-cp .env.example .env   # isi DATABASE_URL dan SHEET_URL
+cp .env.example .env   # isi data koneksi database dan SHEET_URLS
 npm install
 npm start              # http://localhost:3000
 ```
@@ -161,7 +162,7 @@ Chip `#cek` menampilkan "Postgres N valid · M dilewati". "Dilewati" = invoice t
 
    | Variabel | Nilai |
    |---|---|
-   | `DATA_SOURCES` | `postgres` |
+   | `DATA_SOURCES` | `postgres,sheet` (`postgres` saja kalau belum ada Sheet brand) |
    | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | dari langkah 2a (atau satu `DATABASE_URL`, langkah 2b) |
    | `PG_QUERY` | dari `.env.example`, disesuaikan hasil cek |
    | `PG_SSL` | `false` (atau `true` kalau server mewajibkan) |
@@ -194,7 +195,8 @@ Pesan error asli tampil di `/healthz` (`sources.postgres.error`) dan di chip `#c
 | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | – / `5432` | Koneksi Postgres per bagian; password apa adanya. Dipakai bila `DATABASE_URL` kosong. Keduanya kosong = sumber Postgres dilewati. |
 | `PG_QUERY` | `SELECT phone, name, qty, trx_value AS value FROM transactions` | Query yang mengembalikan kolom `phone, name, qty, value`, satu baris per transaksi. |
 | `PG_SSL` | `false` | `true` untuk DB terkelola (Supabase, RDS, Neon, dll). |
-| `SHEET_URL` | – | Link Sheet (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. Kosong = sumber Sheet dilewati. |
+| `SHEET_URLS` | – | Sheet per brand, satu per baris: `Brand \| link`. Tiap brand jadi sumber sendiri. |
+| `SHEET_URL` | – | Satu Sheet tanpa brand (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
 | `DATA_SOURCES` | `postgres,sheet,jubelio` | Batasi sumber, mis. `jubelio` saja. |
 | `JUBELIO_EMAIL`, `JUBELIO_PASSWORD` | – | Login API Jubelio. Kosong = sumber Jubelio dilewati. |
@@ -293,12 +295,40 @@ dengan ribuan order, server Node yang berjalan terus lebih cocok. Progres terlih
 
 Kredensial Jubelio cukup di `.env` / environment variables hosting. Jangan di-commit.
 
-### Google Sheet
+### Google Sheet (per brand)
 
-Kolom dikenali dari judulnya: `No HP`, `Nama`, `qty`, `trx value` (juga `phone`, `telp`, `wa`, `jumlah`,
-`total`, `nilai`, `omzet`, …). Tanpa judul, urutannya dianggap HP, Nama, qty, nilai.
+Transaksi yang tidak masuk warehouse (mis. dicatat manual oleh tiap brand) dibaca dari Google Sheet,
+**satu Sheet per brand**, lalu digabung per nomor HP bersama Postgres.
 
-> Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet: nilainya akan terhitung dua kali.
+Template tiap Sheet brand — baris pertama judul, satu baris = satu transaksi:
+
+| No HP | Nama | qty | trx value |
+|---|---|---|---|
+| 081234567890 | Dewi Lestari | 3 | 2500000 |
+
+- Kolom dikenali dari judulnya (`No HP`, `Nama`, `qty`, `trx value`; juga `phone`, `telp`, `wa`, `jumlah`,
+  `total`, `nilai`, `omzet`, …). Tanpa judul, urutannya dianggap HP, Nama, qty, nilai.
+- `trx value` boleh ditulis `2500000`, `2.500.000`, atau `Rp 2.500.000`. Nomor HP boleh `0812…`, `62812…`,
+  atau `+62 812…`; kolom HP sebaiknya berformat **Plain text** agar tidak berubah jadi `6,28E+12`.
+- Share tiap Sheet: **Anyone with the link → Viewer**.
+
+Daftar Sheet diisi di `SHEET_URLS`, satu brand per baris (di `.env` satu baris, pisahkan dengan `;`):
+
+```
+Heymale | https://docs.google.com/spreadsheets/d/AAA/edit?gid=0
+Heylocal | https://docs.google.com/spreadsheets/d/BBB/edit?gid=0
+Boonaboo | https://docs.google.com/spreadsheets/d/CCC/edit?gid=123
+```
+
+Satu spreadsheet dengan tab per brand juga bisa: pakai link yang sama dengan `gid` tab masing-masing.
+Pastikan `DATA_SOURCES` memuat `sheet` (mis. `postgres,sheet`).
+
+Tiap brand jadi sumber sendiri (`sheet:Heymale`, …). Sheet yang belum ada, belum di-share, atau gagal
+dibaca tidak menghentikan papan: brand lain dan Postgres tetap tampil, dan data terakhir brand itu tetap
+dipakai. Papan TV **tidak** menampilkan peringatan sumber ke penonton; tim melihat status per brand
+(beserta pesan errornya) di `#cek` (`…/#cek`) dan `/healthz`.
+
+> Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet brand: nilainya akan terhitung dua kali.
 
 ## Endpoint
 

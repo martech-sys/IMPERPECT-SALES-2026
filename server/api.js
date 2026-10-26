@@ -23,11 +23,11 @@ function createApi(env, deps) {
       return {
         status: 500,
         body: {
-          error: 'Tidak ada sumber data. Isi DATABASE_HOST (atau DATABASE_URL), SHEET_URL, atau JUBELIO_EMAIL di environment variables, lalu deploy ulang.',
+          error: 'Tidak ada sumber data. Isi DATABASE_HOST (atau DATABASE_URL), SHEET_URL / SHEET_URLS, atau JUBELIO_EMAIL di environment variables, lalu deploy ulang.',
           skipped,
           // names only, never values: which variables this deploy actually received
           env: Object.fromEntries(['DATA_SOURCES', 'DATABASE_URL', 'DATABASE_HOST', 'DATABASE_USER', 'DATABASE_PASSWORD',
-            'DATABASE_NAME', 'PG_QUERY', 'SHEET_URL', 'JUBELIO_EMAIL'].map((k) => [k, env[k] ? 'terisi' : 'kosong'])),
+            'DATABASE_NAME', 'PG_QUERY', 'SHEET_URL', 'SHEET_URLS', 'JUBELIO_EMAIL'].map((k) => [k, env[k] ? 'terisi' : 'kosong'])),
           dataSources: settings.sources
         }
       };
