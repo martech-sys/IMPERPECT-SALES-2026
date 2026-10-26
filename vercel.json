@@ -1,0 +1,17 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "npm ci",
+  "buildCommand": "npm test",
+  "outputDirectory": "public",
+  "regions": ["sin1"],
+  "functions": {
+    "api/state.js": { "maxDuration": 30 }
+  },
+  "rewrites": [
+    { "source": "/healthz", "destination": "/api/state?health=1" }
+  ],
+  "headers": [
+    { "source": "/logo.png", "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }] }
+  ]
+}

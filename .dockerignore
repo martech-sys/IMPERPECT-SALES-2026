@@ -2,5 +2,4 @@ node_modules
 .env
 .git
 test
-netlify
-netlify.toml
+.vercel

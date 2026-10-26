@@ -23,8 +23,8 @@
    the date range page by page, later passes only ask for orders changed since
    the previous pass. Either pass resumes at its page on the next fetch when the
    budget runs out, and orders still waiting for their contact are resolved on
-   later fetches. The sync state goes through cfg.store, so a Netlify Function
-   can keep it in Blobs and a cold start does not begin from zero. */
+   later fetches. The sync state goes through cfg.store (in memory by default),
+   so a host with durable storage can keep it across cold starts. */
 
 const OVERLAP_MS = 5 * 60e3; // start the next change pass a little before this one
 const EMPTY_PHONE_RETRY_MS = 5 * 60e3; // a cashier may add the phone to the contact later

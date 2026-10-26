@@ -6,7 +6,7 @@
 const DEFAULT_QUERY = 'SELECT phone, name, qty, trx_value AS value FROM transactions';
 
 function createPostgresSource(cfg) {
-  // the Netlify Function passes its own statically imported Pool so the bundler ships pg
+  // the Vercel Function passes its own statically imported Pool so the bundler ships pg
   const Pool = cfg.Pool || require('pg').Pool;
   // DATABASE_URL wins; otherwise separate fields, so a password full of
   // punctuation can be given as-is instead of URL-encoded

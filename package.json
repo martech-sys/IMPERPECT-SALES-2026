@@ -2,8 +2,7 @@
   "name": "imperfect-sale-live",
   "version": "1.0.0",
   "private": true,
-  "description": "Papan TV Imperfect Sale 2026: Top Spender Jastiper dari Postgres + Google Sheet",
-  "main": "server/index.js",
+  "description": "Papan TV Imperfect Sale 2026: Top Spender Jastiper dari Postgres (warehouse), Google Sheet, Jubelio",
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
@@ -12,10 +11,9 @@
     "db:seed": "psql \"$DATABASE_URL\" -f db/seed.sql"
   },
   "engines": {
-    "node": ">=20.12"
+    "node": "22.x"
   },
   "dependencies": {
-    "@netlify/blobs": "^8.2.0",
     "pg": "^8.23.1"
   }
 }
