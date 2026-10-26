@@ -11,7 +11,7 @@ function createPostgresSource(cfg) {
   const pool = new Pool({
     connectionString: cfg.url,
     ssl: cfg.ssl ? { rejectUnauthorized: cfg.sslRejectUnauthorized } : undefined,
-    max: 2,
+    max: cfg.maxConnections || 2,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
     statement_timeout: 20000
@@ -24,10 +24,17 @@ function createPostgresSource(cfg) {
     name: 'postgres',
     async fetch() {
       const res = await pool.query(query);
-      return res.rows.map((r, i) => ({ phone: r.phone, name: r.name, qty: r.qty, value: r.value, line: i + 1 }));
+      return res.rows.map((r, i) => ({ phone: r.phone, name: r.name, qty: pgNumber(r.qty), value: pgNumber(r.value), line: i + 1 }));
     },
     close: () => pool.end()
   };
 }
 
-module.exports = { createPostgresSource, DEFAULT_QUERY };
+// pg returns NUMERIC/BIGINT as strings in machine format at the column's scale,
+// e.g. "2500000.0000"; the Sheet-oriented parser would read those decimals as
+// digits, so plain machine numbers are converted here
+function pgNumber(v) {
+  return typeof v === 'string' && /^-?\d+(\.\d+)?$/.test(v) ? Math.round(Number(v)) : v;
+}
+
+module.exports = { createPostgresSource, DEFAULT_QUERY, pgNumber };

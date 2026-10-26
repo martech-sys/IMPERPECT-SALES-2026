@@ -68,24 +68,67 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 | `JUBELIO_VALUE_FIELD` | `grand_total` | Kolom nilai dari detail order, mis. `sub_total`. |
 | `JUBELIO_BUDGET_MS` | `20000` (Netlify `7000`) | Batas waktu sinkron Jubelio per pembacaan. |
 | `POLL_MS` | `30000` | Interval baca ulang di server Node, sekaligus interval polling halaman TV (min 5000). |
-| `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN. |
+| `CACHE_SECONDS` | `15` | Netlify saja: lama hasil `/api/state` di-cache di CDN (= jarak minimum antar query). |
 | `PORT` | `3000` | Port HTTP. |
 
-### Postgres
+### Postgres (warehouse `we_data_store`) — sumber event 2026
 
-Pakai tabel bawaan (`db/schema.sql`):
-
-```bash
-npm run db:init        # buat tabel transactions
-npm run db:seed        # opsional: data contoh, jangan di produksi
-```
-
-Atau arahkan ke tabel yang sudah ada lewat `PG_QUERY`, contoh:
+Transaksi event dibaca dari tabel **`laporan_penjualan`** di warehouse `we_data_store` (sama dengan yang
+dipakai dashboard OFFLINE-STORE). Tabel itu berisi **satu baris per produk**, dengan kolom pelanggan
+`nama` dan `no_hp`, jadi `PG_QUERY` mengelompokkannya per invoice:
 
 ```sql
-SELECT no_hp AS phone, nama AS name, jumlah AS qty, total AS value
-FROM penjualan WHERE event = 'imperfect-2026'
+SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar) AS value
+  FROM laporan_penjualan
+ WHERE warehouse = 'MAIN IMPERFECT WAREHOUS 2026'          -- atau channel = '...', lihat cek di bawah
+   AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
+ GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order)
 ```
+
+- Nilai = **`total_bayar`, diambil sekali per invoice**. `total_bayar` adalah total satu invoice yang
+  berulang di tiap baris produknya; invoice berisi 3 produk tetap dihitung satu kali (`MAX`), bukan
+  dijumlahkan jadi tiga kali lipat. Invoice-invoice berbeda milik nomor HP yang sama dijumlahkan papan.
+- Invoice tanpa `invoice_number` memakai `no_order` sebagai kunci.
+- Batas atas ditulis `< hari berikutnya`, agar transaksi di hari terakhir tidak terbuang kalau `tanggal`
+  bertipe timestamp.
+- Transaksi tanpa `no_hp` tidak masuk papan (terlihat sebagai "dilewati" di `#cek`).
+- Angka `numeric` dari Postgres (mis. `"2500000.0000"`) dibaca dengan benar.
+
+**Sebelum event**, jalankan `scripts/cek-event-postgres.sql` dengan user read-only. Skrip ini hanya
+mencetak nama kolom, nama store/gudang, status, dan hitungan (tanpa data pelanggan) untuk memastikan:
+kolom penyaring event (`warehouse` atau `channel`) dan nilainya, seberapa banyak transaksi event yang
+punya `no_hp`, status apa yang perlu dibuang (batal/retur), dan seberapa cepat transaksi masuk ke tabel.
+
+```bash
+psql "$DATABASE_URL" -f scripts/cek-event-postgres.sql
+```
+
+#### Beban ke database
+
+Papan dirancang agar **jumlah TV tidak menambah beban database**:
+
+- **Satu query per interval, berapa pun TV-nya.** TV membaca `/api/state`, bukan database. Server Node
+  menjalankan `PG_QUERY` sekali tiap `POLL_MS`; di Netlify hasilnya di-cache di CDN selama
+  `CACHE_SECONDS`, jadi function (dan query) jalan paling sering sekali per interval itu.
+- **Koneksi sedikit dan dipakai ulang.** Server Node memakai pool maksimal 2 koneksi, Netlify Function
+  maksimal 1 per instance; koneksi menganggur ditutup setelah 30 detik. Query dibatasi 20 detik
+  (`statement_timeout`).
+- **Hanya hasil agregat yang dikirim**: satu baris per invoice untuk 3 hari event, bukan seluruh tabel.
+
+Yang perlu dipastikan adalah **query-nya memakai index**. `laporan_penjualan` besar; kalau penyaringnya
+tidak ter-index, Postgres membaca seluruh tabel setiap poll. Bagian 6–7 skrip cek menampilkan index
+yang ada dan rencana eksekusi query papan:
+
+- Index yang dipakai OFFLINE-STORE adalah `(sumber, channel, tanggal)`. Kalau event tercatat sebagai
+  satu `channel` di `sumber = 'OFFLINE-STORE'`, saring dengan
+  `sumber = 'OFFLINE-STORE' AND channel = '...' AND tanggal ...` agar index itu terpakai.
+- Kalau event hanya bisa disaring lewat `warehouse`, minta DBA membuat index
+  `(warehouse, tanggal)`, atau naikkan interval.
+- Interval wajar: `POLL_MS=60000` dan `CACHE_SECONDS=30`. Kalau `laporan_penjualan` sendiri diisi
+  berkala (mis. tiap 30 menit), poll lebih cepat dari itu tidak menambah kesegaran, hanya beban.
+
+Untuk tabel lain, cukup ganti `PG_QUERY`; kolom yang dibutuhkan selalu `phone, name, qty, value`.
+Tabel contoh untuk uji lokal ada di `db/schema.sql` + `db/seed.sql` (`npm run db:init`, `npm run db:seed`).
 
 ### Jubelio
 

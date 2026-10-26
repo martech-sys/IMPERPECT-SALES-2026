@@ -22,6 +22,7 @@ const jubelioStore = {
 };
 const sources = createSources(settings, console.warn, {
   Pool: pg.Pool,
+  maxConnections: 1, // one query per refresh; every warm instance holds at most one connection
   jubelio: { store: jubelioStore, budgetMs: parseInt(env.JUBELIO_BUDGET_MS || '7000', 10) }
 });
 const collector = sources.length ? createCollector(sources, { pollMs: settings.pollMs }) : null;
