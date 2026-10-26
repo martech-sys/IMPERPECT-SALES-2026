@@ -3,6 +3,7 @@
 const { createPostgresSource } = require('./sources/postgres');
 const { createSheetSource } = require('./sources/sheet');
 const { createJubelioSource } = require('./sources/jubelio');
+const { createDriveSource } = require('./sources/drive');
 
 /* One place that turns environment variables into sources, shared by the
    long-running server (server/index.js) and the Vercel Function (server/api.js). */
@@ -12,7 +13,7 @@ function loadConfig(env) {
   return {
     port: parseInt(env.PORT || '3000', 10),
     pollMs: Math.max(5000, parseInt(env.POLL_MS || '30000', 10)),
-    sources: (env.DATA_SOURCES || 'postgres,sheet,jubelio').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
+    sources: (env.DATA_SOURCES || 'postgres,sheet,drive,jubelio').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     pg: {
       url: env.DATABASE_URL,
       host: env.DATABASE_HOST,
@@ -26,6 +27,13 @@ function loadConfig(env) {
     },
     sheet: { url: env.SHEET_URL, gid: env.SHEET_GID || '0' },
     brandSheets: parseBrandSheets(env.SHEET_URLS),
+    drive: {
+      folder: env.DRIVE_FOLDER,
+      json: env.GOOGLE_SERVICE_ACCOUNT_JSON,
+      email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
+      privateKey: env.GOOGLE_PRIVATE_KEY,
+      maxRows: parseInt(env.DRIVE_MAX_ROWS || '5000', 10)
+    },
     jubelio: {
       email: env.JUBELIO_EMAIL,
       password: env.JUBELIO_PASSWORD,
@@ -59,6 +67,13 @@ function createSources(config, log, deps) {
       sources.push(createSheetSource({ name, url: b.url, gid: config.sheet.gid }));
     });
     if (!config.sheet.url && !config.brandSheets.length) log('[sheet] SHEET_URL / SHEET_URLS kosong, sumber Sheet dilewati');
+  }
+  if (config.sources.includes('drive')) {
+    if (!config.drive.folder) log('[drive] DRIVE_FOLDER kosong, sumber Sheet brand (Drive) dilewati');
+    else {
+      try { sources.push(createDriveSource(Object.assign({}, config.drive, deps && deps.drive))); }
+      catch (e) { log('[drive] ' + e.message + ', sumber Sheet brand (Drive) dilewati'); }
+    }
   }
   if (config.sources.includes('jubelio')) {
     if (!config.jubelio.email) log('[jubelio] JUBELIO_EMAIL kosong, sumber Jubelio dilewati');

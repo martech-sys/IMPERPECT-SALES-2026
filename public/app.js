@@ -6,7 +6,7 @@
    nomor HP. Halaman ini cukup polling /api/state. Tambahkan #cek di URL untuk diagnostik. */
 var API='api/state';
 var STORE_LS=1500, SPEED=3.4, DWELL=4;  /* SPEED = rem per detik, DWELL = detik berhenti di peringkat 1 */
-var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',jubelio:'Jubelio'};
+var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',drive:'Sheet brand',jubelio:'Jubelio'};
 var LS_KEY='imperfect-live-state-v4';
 var reduced=false;
 try{reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
@@ -185,6 +185,8 @@ function showDiag(snap){
     if(s.info&&s.info.scanning) t+=' · memindai order';
     if(s.info&&s.info.pending) t+=' · '+s.info.pending+' menunggu kontak';
     if(s.info&&s.info.noPhone) t+=' · '+s.info.noPhone+' tanpa HP';
+    if(s.info&&s.info.brands!=null) t+=' · '+s.info.brands+' brand';
+    if(s.info&&s.info.failed&&s.info.failed.length) t+=' · gagal: '+s.info.failed.map(function(f){return f.brand+' ('+f.error+')';}).join(', ');
     return t+(s.stale?' · lama':'');
   });
   if(snap.state) bits.push('nomor unik '+nf.format(snap.state.totals.buyers));
