@@ -15,7 +15,7 @@ Jubelio ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
 - Nomor `0812…`, `62812…`, `+62 812…` dianggap nomor yang sama, dari sumber mana pun.
 - Nomor HP disamarkan (`0812-xxxx-7890`) di server; nomor lengkap tidak pernah dikirim ke browser.
 - Kalau satu sumber gagal (DB restart, Sheet tidak bisa dibuka), papan tetap memakai data terakhir
-  dari sumber itu dan menampilkan peringatan di layar.
+  dari sumber itu tanpa menampilkan peringatan ke penonton; statusnya terlihat di `#cek` dan `/healthz`.
 
 ## Menjalankan
 
@@ -324,10 +324,9 @@ Satu spreadsheet dengan tab per brand juga bisa: pakai link yang sama dengan `gi
 Pastikan `DATA_SOURCES` memuat `sheet` (mis. `postgres,sheet`).
 
 Tiap brand jadi sumber sendiri (`sheet:Heymale`, …). Sheet yang belum ada, belum di-share, atau gagal
-dibaca hanya memunculkan peringatan "Sheet Zoma gagal dibaca" di papan; brand lain dan Postgres tetap
-tampil, dan data terakhir brand itu tetap dipakai. `#cek` dan `/healthz` menunjukkan status per brand.
-Tambahkan brand ke `SHEET_URLS` setelah Sheet-nya siap, supaya papan tidak menampilkan peringatan
-selama persiapan.
+dibaca tidak menghentikan papan: brand lain dan Postgres tetap tampil, dan data terakhir brand itu tetap
+dipakai. Papan TV **tidak** menampilkan peringatan sumber ke penonton; tim melihat status per brand
+(beserta pesan errornya) di `#cek` (`…/#cek`) dan `/healthz`.
 
 > Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet brand: nilainya akan terhitung dua kali.
 

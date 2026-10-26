@@ -175,11 +175,6 @@ function stamp(iso){
   }catch(e){}
 }
 function label(name){return SOURCE_LABEL[name]||(name.indexOf('sheet:')===0?'Sheet '+name.slice(6):name);}
-function sourceNote(sources){
-  var bad=Object.keys(sources||{}).filter(function(k){return !sources[k].ok;});
-  if(!bad.length) return '';
-  return bad.map(label).join(' & ')+' gagal dibaca. Menampilkan data terakhir.';
-}
 function showDiag(snap){
   if(location.hash!=='#cek'){diagChip.hidden=true;return;}
   var src=snap.sources||{},bits=Object.keys(src).map(function(k){
@@ -197,14 +192,16 @@ function showDiag(snap){
 }
 
 /* ---------- polling ---------- */
+/* Source problems (a brand Sheet missing, the database down) are not shown to the
+   audience: the board keeps the last data it has. The team sees them on #cek and /healthz. */
 var failed=0,pollMs=30000;
 function onSnapshot(snap){
   failed=0;
   if(snap.pollMs) pollMs=Math.max(5000,snap.pollMs);
-  var st=snap.state,warn=sourceNote(snap.sources);
+  var st=snap.state;
   if(!st){
     if(!current||current.sample) render(sampleState());
-    showNote(warn||'Menunggu data pertama dari server...');
+    showNote('Menunggu data pertama dari server...');
   }else if(!st.top.length){
     render(sampleState());
     showNote('Belum ada transaksi. Menampilkan data contoh.');
@@ -213,7 +210,6 @@ function onSnapshot(snap){
     saveLocal(st);
     render(st);
     stamp(st.updatedAt);
-    if(warn) showNote(warn);
   }
   showDiag(snap);
 }
