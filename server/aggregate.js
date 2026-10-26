@@ -4,7 +4,7 @@
    into the same record shape {phone, name, qty, value} and merged here, so one
    buyer who shows up in both sources is counted once, under one phone number. */
 
-const STORE_TOP = 30;
+const STORE_TOP = 1500; // the board lists every jastiper, in two scrolling columns
 
 function toNum(s) {
   if (typeof s === 'number') return Number.isFinite(s) ? Math.round(s) : NaN;

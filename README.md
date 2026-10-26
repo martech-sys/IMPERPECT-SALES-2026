@@ -1,8 +1,9 @@
 # Imperfect Sale 2026 — Papan TV Live
 
-Papan TV 16:9 "Top Spender Jastiper": total belanja terbesar per nomor HP, progres level hadiah
-(100 / 200 / 300 / 400 mio) dan top 20 jastiper. Data dibaca dari **Postgres**, **Google Sheet** dan
-**Jubelio** (order dari satu gudang/lokasi),
+Papan TV 16:9 "Ranking Jastiper": **semua jastiper** diurutkan dari belanja terbesar per nomor HP, dalam
+dua kolom yang mengalir sebagai satu daftar (kolom kanan melanjutkan kolom kiri, berhenti sejenak di
+peringkat 1), plus "Juara sementara" di kanan atas. Data dibaca dari **Postgres** (warehouse),
+**Google Sheet per brand** dan opsional **Jubelio**,
 digabung per nomor HP di server, lalu halaman TV polling `/api/state`.
 
 ```
