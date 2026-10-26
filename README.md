@@ -3,13 +3,14 @@
 Papan TV 16:9 "Ranking Jastiper": **semua jastiper** diurutkan dari belanja terbesar per nomor HP, dalam
 dua kolom yang mengalir sebagai satu daftar (kolom kanan melanjutkan kolom kiri, berhenti sejenak di
 peringkat 1), plus "Juara sementara" di kanan atas. Data dibaca dari **Postgres** (warehouse),
-**Google Sheet per brand** dan opsional **Jubelio**,
+**Google Sheet per brand** (satu folder Drive) dan opsional **Jubelio**,
 digabung per nomor HP di server, lalu halaman TV polling `/api/state`.
 
 ```
-Postgres ─┐
- Sheet  ──┼─► server (Node) ─ gabung per nomor HP ─► /api/state ─► public/index.html (TV)
-Jubelio ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
+  Postgres ─┐
+Folder Drive ┼─► server (Node) ─ gabung per nomor HP ─► /api/state ─► public/index.html (TV)
+(Sheet brand)│    poll tiap POLL_MS, simpan data terakhir yang berhasil
+  Jubelio ───┘
 ```
 
 - Nomor `0812…`, `62812…`, `+62 812…` dianggap nomor yang sama, dari sumber mana pun.
@@ -22,7 +23,7 @@ Jubelio ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
 Butuh Node.js 20.12+.
 
 ```bash
-cp .env.example .env   # isi data koneksi database dan SHEET_URLS
+cp .env.example .env   # isi data koneksi database dan DRIVE_FOLDER
 npm install
 npm start              # http://localhost:3000
 ```
@@ -162,7 +163,7 @@ Chip `#cek` menampilkan "Postgres N valid · M dilewati". "Dilewati" = invoice t
 
    | Variabel | Nilai |
    |---|---|
-   | `DATA_SOURCES` | `postgres,sheet` (`postgres` saja kalau belum ada Sheet brand) |
+   | `DATA_SOURCES` | `postgres,drive` (`postgres` saja kalau folder Sheet brand belum siap) |
    | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | dari langkah 2a (atau satu `DATABASE_URL`, langkah 2b) |
    | `PG_QUERY` | dari `.env.example`, disesuaikan hasil cek |
    | `PG_SSL` | `false` (atau `true` kalau server mewajibkan) |
@@ -195,10 +196,13 @@ Pesan error asli tampil di `/healthz` (`sources.postgres.error`) dan di chip `#c
 | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | – / `5432` | Koneksi Postgres per bagian; password apa adanya. Dipakai bila `DATABASE_URL` kosong. Keduanya kosong = sumber Postgres dilewati. |
 | `PG_QUERY` | `SELECT phone, name, qty, trx_value AS value FROM transactions` | Query yang mengembalikan kolom `phone, name, qty, value`, satu baris per transaksi. |
 | `PG_SSL` | `false` | `true` untuk DB terkelola (Supabase, RDS, Neon, dll). |
-| `SHEET_URLS` | – | Sheet per brand, satu per baris: `Brand \| link`. Tiap brand jadi sumber sendiri. |
+| `DRIVE_FOLDER` | – | Link/ID folder Drive berisi satu spreadsheet per brand. Lihat [Sheet brand](#sheet-brand-folder-google-drive--akun-layanan--disarankan-untuk-50-brand). |
+| `GOOGLE_SERVICE_ACCOUNT_JSON` | – | Isi file key JSON akun layanan. Atau `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`. |
+| `DRIVE_MAX_ROWS` | `5000` | Baris maksimum yang dibaca per file brand. |
+| `SHEET_URLS` | – | Sheet per brand lewat link publik, satu per baris: `Brand \| link`. |
 | `SHEET_URL` | – | Satu Sheet tanpa brand (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
-| `DATA_SOURCES` | `postgres,sheet,jubelio` | Batasi sumber, mis. `jubelio` saja. |
+| `DATA_SOURCES` | `postgres,sheet,drive,jubelio` | Batasi sumber. Event 2026: `postgres,drive`. |
 | `JUBELIO_EMAIL`, `JUBELIO_PASSWORD` | – | Login API Jubelio. Kosong = sumber Jubelio dilewati. |
 | `JUBELIO_LOCATION` | – | Nama gudang persis di Jubelio: `MAIN IMPERFECT WAREHOUS 2026`. |
 | `JUBELIO_DATE_FROM`, `JUBELIO_DATE_TO` | – / tanpa batas | Rentang tanggal transaksi event (WIB, `YYYY-MM-DD`). `FROM` wajib. |
@@ -295,45 +299,94 @@ dengan ribuan order, server Node yang berjalan terus lebih cocok. Progres terlih
 
 Kredensial Jubelio cukup di `.env` / environment variables hosting. Jangan di-commit.
 
-### Google Sheet (per brand)
+### Sheet brand (folder Google Drive + akun layanan) — disarankan untuk 50+ brand
 
-Transaksi yang tidak masuk warehouse (mis. dicatat manual oleh tiap brand) dibaca dari Google Sheet,
-**satu Sheet per brand**, lalu digabung per nomor HP bersama Postgres.
+Transaksi yang tidak masuk warehouse (dicatat sendiri oleh tiap brand) diisi di **satu spreadsheet per
+brand**, semuanya di **satu folder Google Drive**. Papan membaca folder itu dengan **akun layanan**
+(service account) Google, lalu menggabungkannya per nomor HP bersama Postgres.
 
-Template tiap Sheet brand — baris pertama judul, satu baris = satu transaksi:
+- Tiap brand hanya di-share ke file-nya sendiri (Editor). Folder tidak di-share ke brand, jadi
+  **brand tidak bisa melihat omzet brand lain**. Tidak ada link publik.
+- Folder di-share **sekali** ke email akun layanan (Viewer); semua file di dalamnya (termasuk yang
+  ditambahkan nanti) otomatis terbaca. Tidak perlu daftar link atau sheet MASTER.
+- Nama file = nama brand (muncul di `#cek`). Yang dibaca: tab **pertama**, kolom A–D.
+- Tiap pembacaan: 1× daftar isi folder, lalu hanya file yang **berubah** sejak pembacaan terakhir yang
+  dibaca ulang. File yang gagal dibaca tetap memakai data terakhirnya; nama brand dan errornya terlihat
+  di `#cek` dan `/healthz` (bukan di TV).
+
+Format tiap file — baris pertama judul, satu baris = satu transaksi:
 
 | No HP | Nama | qty | trx value |
 |---|---|---|---|
 | 081234567890 | Dewi Lestari | 3 | 2500000 |
 
-- Kolom dikenali dari judulnya (`No HP`, `Nama`, `qty`, `trx value`; juga `phone`, `telp`, `wa`, `jumlah`,
-  `total`, `nilai`, `omzet`, …). Tanpa judul, urutannya dianggap HP, Nama, qty, nilai.
-- `trx value` boleh ditulis `2500000`, `2.500.000`, atau `Rp 2.500.000`. Nomor HP boleh `0812…`, `62812…`,
-  atau `+62 812…`; kolom HP sebaiknya berformat **Plain text** agar tidak berubah jadi `6,28E+12`.
-- Share tiap Sheet: **Anyone with the link → Viewer**.
+#### Setup (sekali, ±15 menit)
 
-Daftar Sheet diisi di `SHEET_URLS`, satu brand per baris (di `.env` satu baris, pisahkan dengan `;`):
+1. **Buat akun layanan** — [console.cloud.google.com](https://console.cloud.google.com):
+   1. Pilih/buat project (mis. `imperfect-papan-tv`).
+   2. **APIs & Services → Library**: aktifkan **Google Drive API** dan **Google Sheets API**.
+   3. **IAM & Admin → Service Accounts → Create service account**, nama mis. `papan-tv`. Lewati langkah
+      *roles* dan *grant users access* (tidak perlu role apa pun).
+   4. Buka akun layanan itu → **Keys → Add key → Create new key → JSON**. File `.json` terunduh.
+      Simpan baik-baik: isinya kunci rahasia. Jangan di-commit / dikirim ke chat.
+   5. Catat emailnya: `papan-tv@<project>.iam.gserviceaccount.com`.
+2. **Buat folder** di Google Drive (mis. `Imperfect Sale 2026 – Sheet Brand`) → **Share** → tambahkan
+   email akun layanan sebagai **Viewer** (hapus centang *Notify people*). Jangan share folder ke brand.
+   Google Workspace yang membatasi share ke luar domain perlu mengizinkan domain
+   `iam.gserviceaccount.com` (Admin console → Drive → Sharing settings).
+3. **Buat file per brand** dengan [`scripts/buat-sheet-brand.gs`](scripts/buat-sheet-brand.gs):
+   buka [script.google.com](https://script.google.com) → *New project* → tempel isi file → isi `FOLDER`
+   dan daftar `BRANDS` (`Nama Brand | email1, email2`) → pilih `buatSheetBrand` → **Run**. Script
+   membuat file dengan judul kolom, kolom No HP berformat teks, validasi angka, dan men-share tiap file
+   ke email brand-nya saja. Link tiap brand ada di *Execution log*. Aman dijalankan ulang (brand baru
+   tinggal ditambah ke daftar).
+4. **Vercel → Settings → Environment Variables** (Production), lalu **Redeploy**:
+
+   | Variabel | Isi |
+   |---|---|
+   | `DATA_SOURCES` | `postgres,drive` |
+   | `DRIVE_FOLDER` | link folder dari langkah 2 |
+   | `GOOGLE_SERVICE_ACCOUNT_JSON` | seluruh isi file `.json` dari langkah 1, ditempel apa adanya. Tandai **Sensitive**. |
+
+5. Cek `https://<project>.vercel.app/healthz`: sumber `drive` `ok: true`, dan `#cek` di halaman TV
+   menampilkan `Sheet brand … · N brand`.
+
+Kalau gagal:
+
+| Pesan | Perbaikan |
+|---|---|
+| `Folder Drive tidak bisa dibaca (HTTP 404 …). Share folder ke … sebagai Viewer` | Folder belum di-share ke email akun layanan, atau `DRIVE_FOLDER` salah. |
+| `HTTP 403 … has not been used in project` | Google Drive API / Google Sheets API belum diaktifkan (langkah 1.2). |
+| `Login akun layanan gagal: invalid_grant` | Kunci sudah dihapus / salah tempel. Buat key JSON baru. |
+| `GOOGLE_SERVICE_ACCOUNT_JSON bukan JSON yang valid` | Tempel ulang seluruh isi file, dari `{` sampai `}`. |
+| Brand tidak muncul | File harus berupa Google Sheets (bukan `.xlsx`) dan berada langsung di folder itu. |
+
+Tips untuk brand: isi kolom `trx value` sebagai angka (`2500000`); nomor HP boleh `0812…`, `62812…`, atau
+`+62 812…`. Baris yang nomor HP-nya tidak valid atau nilainya kosong dilewati dan dilaporkan di `#cek`
+sebagai `Brand:baris`.
+
+> Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet brand: nilainya akan terhitung dua kali.
+
+### Google Sheet dengan link (alternatif)
+
+Tanpa akun layanan, Sheet bisa dibaca lewat link publik: Share **Anyone with the link → Viewer**. Siapa pun
+yang memegang link bisa melihat isinya, jadi untuk omzet brand pakai cara folder Drive di atas.
+
+Daftar Sheet diisi di `SHEET_URLS`, satu brand per baris (di `.env` satu baris, pisahkan dengan `;`), dan
+`DATA_SOURCES` harus memuat `sheet`:
 
 ```
 Heymale | https://docs.google.com/spreadsheets/d/AAA/edit?gid=0
 Heylocal | https://docs.google.com/spreadsheets/d/BBB/edit?gid=0
-Boonaboo | https://docs.google.com/spreadsheets/d/CCC/edit?gid=123
 ```
 
-Satu spreadsheet dengan tab per brand juga bisa: pakai link yang sama dengan `gid` tab masing-masing.
-Pastikan `DATA_SOURCES` memuat `sheet` (mis. `postgres,sheet`).
-
-Tiap brand jadi sumber sendiri (`sheet:Heymale`, …). Sheet yang belum ada, belum di-share, atau gagal
-dibaca tidak menghentikan papan: brand lain dan Postgres tetap tampil, dan data terakhir brand itu tetap
-dipakai. Papan TV **tidak** menampilkan peringatan sumber ke penonton; tim melihat status per brand
-(beserta pesan errornya) di `#cek` (`…/#cek`) dan `/healthz`.
-
-> Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet brand: nilainya akan terhitung dua kali.
+Tiap brand jadi sumber sendiri (`sheet:Heymale`, …); Sheet yang gagal dibaca tidak menghentikan papan.
+`SHEET_URL` membaca satu Sheet tanpa nama brand.
 
 ## Endpoint
 
 - `GET /` — halaman TV
-- `GET /api/state` — `{ state: { updatedAt, totals, top[] }, sources: { postgres, sheet }, pollMs }`
+- `GET /api/state` — `{ state: { updatedAt, totals, top[] }, sources: { postgres, drive, … }, pollMs }`
 - `GET /healthz` — 200 bila minimal satu sumber terbaca, 503 bila tidak
 
 ## Tes
