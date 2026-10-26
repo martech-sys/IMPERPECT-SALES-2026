@@ -1,7 +1,7 @@
 # Imperfect Sale 2026 — Papan TV Live
 
 Papan TV 16:9 "Top Spender Jastiper": total belanja terbesar per nomor HP, progres level hadiah
-(100 / 200 / 300 / 400 mio) dan top 10 jastiper. Data dibaca dari **Postgres**, **Google Sheet** dan
+(100 / 200 / 300 / 400 mio) dan top 20 jastiper. Data dibaca dari **Postgres**, **Google Sheet** dan
 **Jubelio** (order dari satu gudang/lokasi),
 digabung per nomor HP di server, lalu halaman TV polling `/api/state`.
 
@@ -39,8 +39,8 @@ Repo ini sudah siap untuk Netlify (`netlify.toml`):
 
 Langkah:
 
-1. Di Netlify: **Project configuration → Environment variables**, isi `DATABASE_URL`, `SHEET_URL`,
-   `SHEET_GID`, dan bila perlu `PG_QUERY`, `PG_SSL=true` (lihat tabel di bawah).
+1. Di Netlify: **Project configuration → Environment variables**, isi variabel sumber data. Untuk event
+   2026 (warehouse Postgres) ikuti [Setup koneksi database](#setup-koneksi-database-warehouse-we_data_store).
 2. Database harus bisa diakses dari internet (Netlify Functions berjalan di AWS, bukan di jaringan kantor).
    Untuk Postgres terkelola (Supabase, Neon, RDS), pakai URL *pooler* bila tersedia.
 3. Deploy ulang. Cek `https://<site>.netlify.app/healthz` → `200` artinya minimal satu sumber terbaca.
@@ -52,11 +52,138 @@ bertahan selama instance function masih hangat.
 
 Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah baris valid / dilewati per sumber.
 
+## Setup koneksi database (warehouse `we_data_store`)
+
+Langkah menyambungkan papan ke tabel `laporan_penjualan`. Password database cukup diisi di `.env`
+(lokal) dan di Netlify; jangan dikirim lewat chat atau di-commit.
+
+### 1. Siapkan user read-only
+
+Minta DBA membuat user khusus papan yang hanya bisa membaca satu tabel. Lebih aman, dan bebannya
+terbatas:
+
+```sql
+CREATE ROLE imperfect_tv LOGIN PASSWORD 'ganti-password-kuat' CONNECTION LIMIT 5;
+GRANT CONNECT ON DATABASE we_data_store TO imperfect_tv;
+GRANT USAGE ON SCHEMA public TO imperfect_tv;          -- ganti public kalau tabelnya di schema lain
+GRANT SELECT ON laporan_penjualan TO imperfect_tv;
+ALTER ROLE imperfect_tv SET statement_timeout = '20s';
+```
+
+Sementara belum ada, user read-only yang dipakai OFFLINE-STORE / `data-db` juga bisa (secrets
+`DATABASE_HOST`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` di repo itu).
+
+### 2. Isi data koneksi
+
+Pilih **salah satu** cara. Kalau keduanya terisi, `DATABASE_URL` yang dipakai.
+
+**a. Variabel terpisah (disarankan, terutama kalau password banyak tanda bacanya).** Password ditulis
+apa adanya, tanpa encode:
+
+```
+DATABASE_HOST=1.2.3.4
+DATABASE_PORT=5432
+DATABASE_USER=imperfect_tv
+DATABASE_PASSWORD='Rh#4s!a/9?q@x:%20'
+DATABASE_NAME=we_data_store
+```
+
+Di `.env`, **selalu apit password dengan kutip tunggal**. Tanpa kutip, `#` di posisi mana pun dibaca
+sebagai awal komentar: `DATABASE_PASSWORD=Rh#4s` hanya terbaca `Rh`. Kalau password sendiri memuat
+kutip tunggal, pakai kutip ganda (`"..."`). Di Netlify tidak perlu kutip: tempel apa adanya di kolom
+nilai.
+
+**b. Satu `DATABASE_URL`.**
+
+```
+postgres://USER:PASSWORD@HOST:5432/we_data_store
+```
+
+Tanda baca di password harus di-encode (`#` → `%23`, `/` → `%2F`, `?` → `%3F`, `@` → `%40`,
+`:` → `%3A`, `%` → `%25`, dst.). Supaya tidak salah, biarkan komputer yang meng-encode. Perintah ini
+meminta password tanpa menampilkannya dan tidak menyimpannya di riwayat shell:
+
+```bash
+read -rs PW && PW="$PW" node -e 'console.log(encodeURIComponent(process.env.PW))'; unset PW
+```
+
+Lainnya:
+
+- Kalau tabelnya di schema lain (mis. `mysql_db_store`): dengan `DATABASE_URL`, tambahkan di ujungnya
+  `?options=-c%20search_path%3Dmysql_db_store`; dengan variabel terpisah, ubah `PG_QUERY` menjadi
+  `FROM mysql_db_store.laporan_penjualan`.
+- SSL: OFFLINE-STORE memakai `DATABASE_SSL=false`, jadi mulai dengan `PG_SSL=false`.
+- Untuk `psql` di langkah 3, variabel terpisah dipetakan ke `PGHOST`, `PGPORT`, `PGUSER`,
+  `PGPASSWORD`, `PGDATABASE`, lalu jalankan `psql` tanpa argumen koneksi.
+
+### 3. Tes koneksi dan jalankan skrip cek
+
+Dengan `psql` (atau DBeaver/TablePlus):
+
+```bash
+psql "$DATABASE_URL" -c "select current_user, current_database(), now()"
+psql "$DATABASE_URL" -f scripts/cek-event-postgres.sql
+# atau, dengan variabel terpisah:
+export PGHOST=... PGPORT=5432 PGUSER=... PGDATABASE=we_data_store
+read -rs PGPASSWORD && export PGPASSWORD
+psql -f scripts/cek-event-postgres.sql
+```
+
+Hasil skrip cek hanya berisi nama kolom, store/gudang, status, dan hitungan (tanpa data pelanggan),
+jadi aman dibagikan. Dari situ `PG_QUERY` disesuaikan: kolom dan nilai penanda event (`warehouse` atau
+`channel`), status yang dibuang, dan penyaring yang memakai index
+(lihat [Beban ke database](#beban-ke-database)).
+
+### 4. (Opsional) Coba di laptop
+
+```bash
+git pull
+cp .env.example .env      # isi data koneksi (langkah 2); PG_QUERY sesuaikan hasil langkah 3
+npm install
+npm start                 # buka http://localhost:3000/#cek
+```
+
+Chip `#cek` menampilkan "Postgres N valid · M dilewati". "Dilewati" = invoice tanpa nomor HP.
+
+### 5. Pasang di Netlify
+
+1. Netlify → project **imperpect-sales2026** → **Project configuration → Environment variables →
+   Add a variable**. Scope minimal harus mencakup **Functions**; tandai `DATABASE_PASSWORD` (atau
+   `DATABASE_URL`) sebagai *secret*.
+
+   | Variabel | Nilai |
+   |---|---|
+   | `DATA_SOURCES` | `postgres` |
+   | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | dari langkah 2a (atau satu `DATABASE_URL`, langkah 2b) |
+   | `PG_QUERY` | dari `.env.example`, disesuaikan hasil cek |
+   | `PG_SSL` | `false` (atau `true` kalau server mewajibkan) |
+   | `POLL_MS` | `60000` |
+   | `CACHE_SECONDS` | `30` |
+
+2. **Deploys → Trigger deploy → Deploy project.** Perubahan env baru berlaku setelah deploy ulang.
+3. Cek:
+   - `https://imperpect-sales2026.netlify.app/healthz` → status `200` dengan `"ok":true`.
+   - `https://imperpect-sales2026.netlify.app/#cek` → jumlah invoice valid.
+
+### 6. Kalau gagal
+
+Pesan error asli tampil di `/healthz` (`sources.postgres.error`) dan di chip `#cek`:
+
+| Pesan | Penyebab dan solusi |
+|---|---|
+| `password authentication failed` | Password salah. Dengan `DATABASE_URL`: tanda bacanya belum di-encode; pakai variabel terpisah (langkah 2a). |
+| `timeout` / `ECONNREFUSED` | Host/port salah, atau firewall database menolak. Netlify tidak punya IP tetap, jadi user ini harus boleh masuk dari IP mana pun. |
+| `relation "laporan_penjualan" does not exist` | Tabel ada di schema lain: tambahkan `search_path` (langkah 2). |
+| `permission denied for table` | `GRANT SELECT` belum diberikan (langkah 1). |
+| `no pg_hba.conf entry ... SSL off` | Set `PG_SSL=true`. |
+| `self-signed certificate` | Set juga `PG_SSL_REJECT_UNAUTHORIZED=false`. |
+
 ## Konfigurasi (`.env`)
 
 | Variabel | Default | Keterangan |
 |---|---|---|
-| `DATABASE_URL` | – | Koneksi Postgres. Kosong = sumber Postgres dilewati. |
+| `DATABASE_URL` | – | Koneksi Postgres sebagai URL (password di-encode). Didahulukan bila terisi. |
+| `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | – / `5432` | Koneksi Postgres per bagian; password apa adanya. Dipakai bila `DATABASE_URL` kosong. Keduanya kosong = sumber Postgres dilewati. |
 | `PG_QUERY` | `SELECT phone, name, qty, trx_value AS value FROM transactions` | Query yang mengembalikan kolom `phone, name, qty, value`, satu baris per transaksi. |
 | `PG_SSL` | `false` | `true` untuk DB terkelola (Supabase, RDS, Neon, dll). |
 | `SHEET_URL` | – | Link Sheet (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. Kosong = sumber Sheet dilewati. |

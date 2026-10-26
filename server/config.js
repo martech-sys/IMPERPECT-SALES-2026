@@ -15,6 +15,11 @@ function loadConfig(env) {
     sources: (env.DATA_SOURCES || 'postgres,sheet,jubelio').split(',').map((s) => s.trim().toLowerCase()).filter(Boolean),
     pg: {
       url: env.DATABASE_URL,
+      host: env.DATABASE_HOST,
+      port: parseInt(env.DATABASE_PORT || '5432', 10),
+      user: env.DATABASE_USER,
+      password: env.DATABASE_PASSWORD,
+      database: env.DATABASE_NAME,
       query: env.PG_QUERY,
       ssl: flag(env.PG_SSL, false),
       sslRejectUnauthorized: flag(env.PG_SSL_REJECT_UNAUTHORIZED, true)
@@ -38,8 +43,8 @@ function loadConfig(env) {
 function createSources(config, log, deps) {
   const sources = [];
   if (config.sources.includes('postgres')) {
-    if (config.pg.url) sources.push(createPostgresSource(Object.assign({}, config.pg, deps)));
-    else log('[postgres] DATABASE_URL kosong, sumber Postgres dilewati');
+    if (config.pg.url || config.pg.host) sources.push(createPostgresSource(Object.assign({}, config.pg, deps)));
+    else log('[postgres] DATABASE_URL / DATABASE_HOST kosong, sumber Postgres dilewati');
   }
   if (config.sources.includes('sheet')) {
     if (config.sheet.url) sources.push(createSheetSource(config.sheet));
