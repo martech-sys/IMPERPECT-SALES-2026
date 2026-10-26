@@ -8,14 +8,17 @@ const DEFAULT_QUERY = 'SELECT phone, name, qty, trx_value AS value FROM transact
 function createPostgresSource(cfg) {
   // the Netlify Function passes its own statically imported Pool so the bundler ships pg
   const Pool = cfg.Pool || require('pg').Pool;
-  const pool = new Pool({
-    connectionString: cfg.url,
+  // DATABASE_URL wins; otherwise separate fields, so a password full of
+  // punctuation can be given as-is instead of URL-encoded
+  const conn = cfg.url ? { connectionString: cfg.url }
+    : { host: cfg.host, port: cfg.port, user: cfg.user, password: cfg.password, database: cfg.database };
+  const pool = new Pool(Object.assign(conn, {
     ssl: cfg.ssl ? { rejectUnauthorized: cfg.sslRejectUnauthorized } : undefined,
     max: cfg.maxConnections || 2,
     connectionTimeoutMillis: 10000,
     idleTimeoutMillis: 30000,
     statement_timeout: 20000
-  });
+  }));
   // an idle client dropping its connection must not crash the server
   pool.on('error', (e) => console.error('[postgres] idle client error:', e.message));
   const query = cfg.query || DEFAULT_QUERY;
