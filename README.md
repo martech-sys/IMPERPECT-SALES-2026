@@ -75,18 +75,20 @@ Tambahkan `#cek` di URL (`http://localhost:3000/#cek`) untuk melihat jumlah bari
 
 Transaksi event dibaca dari tabel **`laporan_penjualan`** di warehouse `we_data_store` (sama dengan yang
 dipakai dashboard OFFLINE-STORE). Tabel itu berisi **satu baris per produk**, dengan kolom pelanggan
-`nama` dan `no_hp`, jadi `PG_QUERY` menjumlahkannya per invoice:
+`nama` dan `no_hp`, jadi `PG_QUERY` mengelompokkannya per invoice:
 
 ```sql
-SELECT no_hp AS phone, MAX(nama) AS name, SUM(qty) AS qty, SUM(total_harga_barang) AS value
+SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar) AS value
   FROM laporan_penjualan
  WHERE warehouse = 'MAIN IMPERFECT WAREHOUS 2026'          -- atau channel = '...', lihat cek di bawah
    AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
- GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order), no_hp
+ GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order)
 ```
 
-- Nilai = `total_harga_barang` (tingkat baris). `total_bayar` adalah total invoice yang berulang di tiap
-  baris produknya, jadi menjumlahkannya menggelembungkan angka.
+- Nilai = **`total_bayar`, diambil sekali per invoice**. `total_bayar` adalah total satu invoice yang
+  berulang di tiap baris produknya; invoice berisi 3 produk tetap dihitung satu kali (`MAX`), bukan
+  dijumlahkan jadi tiga kali lipat. Invoice-invoice berbeda milik nomor HP yang sama dijumlahkan papan.
+- Invoice tanpa `invoice_number` memakai `no_order` sebagai kunci.
 - Batas atas ditulis `< hari berikutnya`, agar transaksi di hari terakhir tidak terbuang kalau `tanggal`
   bertipe timestamp.
 - Transaksi tanpa `no_hp` tidak masuk papan (terlihat sebagai "dilewati" di `#cek`).

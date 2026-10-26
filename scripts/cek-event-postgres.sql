@@ -26,19 +26,28 @@ SELECT sumber, channel, warehouse,
  GROUP BY sumber, channel, warehouse
  ORDER BY tanggal_akhir DESC, baris DESC;
 
-\echo '== 3. Event 2025 (20-23 Nov): berapa baris yang punya nomor HP =='
+\echo '== 3. Event 2025 (20-23 Nov): berapa invoice yang punya nomor HP, omzet = total_bayar sekali per invoice =='
+WITH inv AS (
+  SELECT channel, warehouse,
+         COALESCE(NULLIF(btrim(invoice_number), ''), no_order) AS invoice,
+         MAX(NULLIF(btrim(no_hp), '')) AS no_hp,
+         MAX(total_bayar) AS total_bayar,
+         COUNT(*) AS baris_produk
+    FROM laporan_penjualan
+   WHERE tanggal >= DATE '2025-11-20' AND tanggal < DATE '2025-11-24'
+     AND (channel ILIKE '%imperf%' OR warehouse ILIKE '%imperf%')
+   GROUP BY 1, 2, 3
+)
 SELECT channel, warehouse,
-       COUNT(*) AS baris,
-       COUNT(*) FILTER (WHERE NULLIF(btrim(no_hp), '') IS NOT NULL) AS baris_ada_hp,
-       COUNT(*) FILTER (WHERE no_hp LIKE '%*%') AS baris_hp_tersamar,
-       COUNT(DISTINCT NULLIF(btrim(no_hp), '')) AS nomor_hp_unik,
-       COUNT(DISTINCT COALESCE(NULLIF(btrim(invoice_number), ''), no_order)) AS invoice,
-       SUM(total_harga_barang) AS omzet
-  FROM laporan_penjualan
- WHERE tanggal >= DATE '2025-11-20' AND tanggal < DATE '2025-11-24'
-   AND (channel ILIKE '%imperf%' OR warehouse ILIKE '%imperf%')
+       COUNT(*) AS invoice,
+       SUM(baris_produk) AS baris_produk,
+       COUNT(*) FILTER (WHERE no_hp IS NOT NULL) AS invoice_ada_hp,
+       COUNT(*) FILTER (WHERE no_hp LIKE '%*%') AS invoice_hp_tersamar,
+       COUNT(DISTINCT no_hp) AS nomor_hp_unik,
+       SUM(total_bayar) AS omzet_total_bayar
+  FROM inv
  GROUP BY channel, warehouse
- ORDER BY baris DESC;
+ ORDER BY invoice DESC;
 
 \echo '== 4. Nilai status pada baris event 2025 (untuk memutuskan apa yang dibuang, mis. batal/retur) =='
 SELECT status, COUNT(*) AS baris, SUM(total_harga_barang) AS omzet
