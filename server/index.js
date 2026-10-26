@@ -11,7 +11,7 @@ try { process.loadEnvFile(path.join(__dirname, '..', '.env')); } catch (e) { /* 
 const config = loadConfig(process.env);
 const sources = createSources(config, console.warn);
 if (!sources.length) {
-  console.error('Tidak ada sumber data. Isi DATABASE_HOST (atau DATABASE_URL), SHEET_URL, atau JUBELIO_EMAIL (lihat .env.example).');
+  console.error('Tidak ada sumber data. Isi DATABASE_HOST (atau DATABASE_URL), SHEET_URL / SHEET_URLS, atau JUBELIO_EMAIL (lihat .env.example).');
   process.exit(1);
 }
 

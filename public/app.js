@@ -206,7 +206,7 @@ function stamp(iso){
     $('lastup-t').textContent=f+' WIB';
   }catch(e){}
 }
-function label(name){return SOURCE_LABEL[name]||name;}
+function label(name){return SOURCE_LABEL[name]||(name.indexOf('sheet:')===0?'Sheet '+name.slice(6):name);}
 function sourceNote(sources){
   var bad=Object.keys(sources||{}).filter(function(k){return !sources[k].ok;});
   if(!bad.length) return '';

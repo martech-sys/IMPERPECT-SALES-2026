@@ -41,3 +41,28 @@ test('no database settings: Postgres source is skipped with a note', () => {
   assert.equal(sources.length, 0);
   assert.match(notes[0], /DATABASE_URL \/ DATABASE_HOST kosong/);
 });
+
+test('SHEET_URLS: one source per brand, names from "Brand | link"', () => {
+  const { parseBrandSheets } = require('../server/config');
+  const parsed = parseBrandSheets([
+    'Heymale | https://docs.google.com/spreadsheets/d/AAA/edit?gid=1',
+    '# komentar diabaikan',
+    '',
+    '  Heylocal   Store |https://docs.google.com/spreadsheets/d/BBB/edit#gid=2  ',
+    'https://docs.google.com/spreadsheets/d/CCC/edit'
+  ].join('\n') + ';Boonaboo | DDD');
+  assert.deepEqual(parsed, [
+    { brand: 'Heymale', url: 'https://docs.google.com/spreadsheets/d/AAA/edit?gid=1' },
+    { brand: 'Heylocal Store', url: 'https://docs.google.com/spreadsheets/d/BBB/edit#gid=2' },
+    { brand: 'Sheet 3', url: 'https://docs.google.com/spreadsheets/d/CCC/edit' },
+    { brand: 'Boonaboo', url: 'DDD' }
+  ]);
+
+  const notes = [];
+  const sources = createSources(loadConfig({
+    DATA_SOURCES: 'sheet',
+    SHEET_URLS: 'Heymale | https://x/a?output=csv\nHeymale | https://x/b?output=csv\nZoma | https://x/c?output=csv'
+  }), (m) => notes.push(m), {});
+  assert.deepEqual(sources.map((s) => s.name), ['sheet:Heymale', 'sheet:Zoma']);
+  assert.match(notes[0], /dua kali/);
+});

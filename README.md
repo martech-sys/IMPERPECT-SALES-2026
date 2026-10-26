@@ -21,7 +21,7 @@ Jubelio ──┘     poll tiap POLL_MS, simpan data terakhir yang berhasil
 Butuh Node.js 20.12+.
 
 ```bash
-cp .env.example .env   # isi DATABASE_URL dan SHEET_URL
+cp .env.example .env   # isi data koneksi database dan SHEET_URLS
 npm install
 npm start              # http://localhost:3000
 ```
@@ -161,7 +161,7 @@ Chip `#cek` menampilkan "Postgres N valid · M dilewati". "Dilewati" = invoice t
 
    | Variabel | Nilai |
    |---|---|
-   | `DATA_SOURCES` | `postgres` |
+   | `DATA_SOURCES` | `postgres,sheet` (`postgres` saja kalau belum ada Sheet brand) |
    | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | dari langkah 2a (atau satu `DATABASE_URL`, langkah 2b) |
    | `PG_QUERY` | dari `.env.example`, disesuaikan hasil cek |
    | `PG_SSL` | `false` (atau `true` kalau server mewajibkan) |
@@ -194,7 +194,8 @@ Pesan error asli tampil di `/healthz` (`sources.postgres.error`) dan di chip `#c
 | `DATABASE_HOST`, `DATABASE_PORT`, `DATABASE_USER`, `DATABASE_PASSWORD`, `DATABASE_NAME` | – / `5432` | Koneksi Postgres per bagian; password apa adanya. Dipakai bila `DATABASE_URL` kosong. Keduanya kosong = sumber Postgres dilewati. |
 | `PG_QUERY` | `SELECT phone, name, qty, trx_value AS value FROM transactions` | Query yang mengembalikan kolom `phone, name, qty, value`, satu baris per transaksi. |
 | `PG_SSL` | `false` | `true` untuk DB terkelola (Supabase, RDS, Neon, dll). |
-| `SHEET_URL` | – | Link Sheet (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. Kosong = sumber Sheet dilewati. |
+| `SHEET_URLS` | – | Sheet per brand, satu per baris: `Brand \| link`. Tiap brand jadi sumber sendiri. |
+| `SHEET_URL` | – | Satu Sheet tanpa brand (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
 | `DATA_SOURCES` | `postgres,sheet,jubelio` | Batasi sumber, mis. `jubelio` saja. |
 | `JUBELIO_EMAIL`, `JUBELIO_PASSWORD` | – | Login API Jubelio. Kosong = sumber Jubelio dilewati. |
@@ -293,12 +294,41 @@ dengan ribuan order, server Node yang berjalan terus lebih cocok. Progres terlih
 
 Kredensial Jubelio cukup di `.env` / environment variables hosting. Jangan di-commit.
 
-### Google Sheet
+### Google Sheet (per brand)
 
-Kolom dikenali dari judulnya: `No HP`, `Nama`, `qty`, `trx value` (juga `phone`, `telp`, `wa`, `jumlah`,
-`total`, `nilai`, `omzet`, …). Tanpa judul, urutannya dianggap HP, Nama, qty, nilai.
+Transaksi yang tidak masuk warehouse (mis. dicatat manual oleh tiap brand) dibaca dari Google Sheet,
+**satu Sheet per brand**, lalu digabung per nomor HP bersama Postgres.
 
-> Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet: nilainya akan terhitung dua kali.
+Template tiap Sheet brand — baris pertama judul, satu baris = satu transaksi:
+
+| No HP | Nama | qty | trx value |
+|---|---|---|---|
+| 081234567890 | Dewi Lestari | 3 | 2500000 |
+
+- Kolom dikenali dari judulnya (`No HP`, `Nama`, `qty`, `trx value`; juga `phone`, `telp`, `wa`, `jumlah`,
+  `total`, `nilai`, `omzet`, …). Tanpa judul, urutannya dianggap HP, Nama, qty, nilai.
+- `trx value` boleh ditulis `2500000`, `2.500.000`, atau `Rp 2.500.000`. Nomor HP boleh `0812…`, `62812…`,
+  atau `+62 812…`; kolom HP sebaiknya berformat **Plain text** agar tidak berubah jadi `6,28E+12`.
+- Share tiap Sheet: **Anyone with the link → Viewer**.
+
+Daftar Sheet diisi di `SHEET_URLS`, satu brand per baris (di `.env` satu baris, pisahkan dengan `;`):
+
+```
+Heymale | https://docs.google.com/spreadsheets/d/AAA/edit?gid=0
+Heylocal | https://docs.google.com/spreadsheets/d/BBB/edit?gid=0
+Boonaboo | https://docs.google.com/spreadsheets/d/CCC/edit?gid=123
+```
+
+Satu spreadsheet dengan tab per brand juga bisa: pakai link yang sama dengan `gid` tab masing-masing.
+Pastikan `DATA_SOURCES` memuat `sheet` (mis. `postgres,sheet`).
+
+Tiap brand jadi sumber sendiri (`sheet:Heymale`, …). Sheet yang belum ada, belum di-share, atau gagal
+dibaca hanya memunculkan peringatan "Sheet Zoma gagal dibaca" di papan; brand lain dan Postgres tetap
+tampil, dan data terakhir brand itu tetap dipakai. `#cek` dan `/healthz` menunjukkan status per brand.
+Tambahkan brand ke `SHEET_URLS` setelah Sheet-nya siap, supaya papan tidak menampilkan peringatan
+selama persiapan.
+
+> Jangan memasukkan transaksi yang sama ke Postgres **dan** Sheet brand: nilainya akan terhitung dua kali.
 
 ## Endpoint
 
