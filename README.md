@@ -305,8 +305,8 @@ Transaksi yang tidak masuk warehouse (dicatat sendiri oleh tiap brand) diisi di 
 brand**, semuanya di **satu folder Google Drive**. Papan membaca folder itu dengan **akun layanan**
 (service account) Google, lalu menggabungkannya per nomor HP bersama Postgres.
 
-- Tiap brand hanya di-share ke file-nya sendiri (Editor). Folder tidak di-share ke brand, jadi
-  **brand tidak bisa melihat omzet brand lain**. Tidak ada link publik.
+- Tiap brand hanya menerima link / akses ke file-nya sendiri. Folder tidak di-share ke brand, jadi
+  **brand tidak bisa melihat omzet brand lain** (daftar isi folder dan link brand lain tidak terlihat).
 - Folder di-share **sekali** ke email akun layanan (Viewer); semua file di dalamnya (termasuk yang
   ditambahkan nanti) otomatis terbaca. Tidak perlu daftar link atau sheet MASTER.
 - Nama file = nama brand (muncul di `#cek`). Yang dibaca: tab **pertama**, kolom A–D.
@@ -334,12 +334,19 @@ Format tiap file — baris pertama judul, satu baris = satu transaksi:
    email akun layanan sebagai **Viewer** (hapus centang *Notify people*). Jangan share folder ke brand.
    Google Workspace yang membatasi share ke luar domain perlu mengizinkan domain
    `iam.gserviceaccount.com` (Admin console → Drive → Sharing settings).
-3. **Buat file per brand** dengan [`scripts/buat-sheet-brand.gs`](scripts/buat-sheet-brand.gs):
-   buka [script.google.com](https://script.google.com) → *New project* → tempel isi file → isi `FOLDER`
-   dan daftar `BRANDS` (`Nama Brand | email1, email2`) → pilih `buatSheetBrand` → **Run**. Script
-   membuat file dengan judul kolom, kolom No HP berformat teks, validasi angka, dan men-share tiap file
-   ke email brand-nya saja. Link tiap brand ada di *Execution log*. Aman dijalankan ulang (brand baru
-   tinggal ditambah ke daftar).
+3. **Buat file per brand** dengan [`scripts/buat-sheet-brand.gs`](scripts/buat-sheet-brand.gs) (daftar
+   37 brand event 2026 sudah terisi): buka [script.google.com](https://script.google.com) → *New project* →
+   tempel isi file → isi `FOLDER` → pilih `buatSheetBrand` → **Run**. Script membuat file dengan judul
+   kolom, kolom No HP berformat teks, dan validasi angka. Dengan `AKSES = 'link'` (bawaan) tiap file
+   dibuka *Anyone with the link → Editor*, tanpa email; dengan `'email'` hanya email di `BRANDS` yang
+   diberi akses. Link tiap brand ditulis ke spreadsheet **Daftar Link Sheet Brand** di My Drive admin:
+   kirim ke tiap brand **hanya link miliknya**. Aman dijalankan ulang (brand baru tinggal ditambah).
+
+   > Dengan akses link, siapa pun yang memegang link sebuah file bisa melihat dan mengubah isinya
+   > (termasuk nomor HP pembeli). Brand tetap tidak bisa melihat file brand lain selama link tidak
+   > disebar. Link file tidak bisa diganti; kalau satu link bocor, ubah file itu ke *Share → General
+   > access → Restricted* lalu tambahkan email tim brand tersebut. Riwayat perubahan ada di
+   > *File → Version history*.
 4. **Vercel → Settings → Environment Variables** (Production), lalu **Redeploy**:
 
    | Variabel | Isi |
