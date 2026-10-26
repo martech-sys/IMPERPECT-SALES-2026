@@ -20,7 +20,9 @@ const jubelioStore = {
   load: () => getStore({ name: 'imperfect-jubelio', consistency: 'strong' }).get('sync', { type: 'json' }),
   save: (s) => getStore({ name: 'imperfect-jubelio', consistency: 'strong' }).setJSON('sync', s)
 };
-const sources = createSources(settings, console.warn, {
+// why each source was skipped, shown on /healthz when nothing is configured
+const skipped = [];
+const sources = createSources(settings, (m) => { skipped.push(m); console.warn(m); }, {
   Pool: pg.Pool,
   maxConnections: 1, // one query per refresh; every warm instance holds at most one connection
   jubelio: { store: jubelioStore, budgetMs: parseInt(env.JUBELIO_BUDGET_MS || '7000', 10) }
@@ -39,7 +41,14 @@ function json(status, body, cdnCache) {
 
 export default async (req) => {
   if (!collector) {
-    return json(500, { error: 'Tidak ada sumber data. Isi DATABASE_URL dan/atau SHEET_URL di environment variables Netlify.' });
+    return json(500, {
+      error: 'Tidak ada sumber data. Isi DATABASE_HOST (atau DATABASE_URL), SHEET_URL, atau JUBELIO_EMAIL di environment variables Netlify, lalu deploy ulang.',
+      skipped,
+      // names only, never values: which variables this deploy actually received
+      env: Object.fromEntries(['DATA_SOURCES', 'DATABASE_URL', 'DATABASE_HOST', 'DATABASE_USER', 'DATABASE_PASSWORD',
+        'DATABASE_NAME', 'PG_QUERY', 'SHEET_URL', 'JUBELIO_EMAIL'].map((k) => [k, env[k] ? 'terisi' : 'kosong'])),
+      dataSources: settings.sources
+    });
   }
   if (Date.now() - lastRefresh >= cacheSeconds * 1000) {
     await collector.refresh();
