@@ -1,22 +1,23 @@
 'use strict';
 
 /* Brand spreadsheets in one Google Drive folder, read with a service account.
-   Read-only: the token asks for drive.readonly + spreadsheets.readonly only.
+   Read-only: the token asks for drive.readonly only.
 
    - Each brand fills its own spreadsheet; the folder is shared with the
      service account (Viewer) once, so every file in it is readable while the
      brand teams only see their own file. No link is public.
-   - Each fetch lists the folder once (Drive API) and re-reads only the files
-     whose modifiedTime changed (Sheets API, first tab, columns A:D), so 50+
-     brands cost one listing plus the few files edited since the last fetch.
+   - Each fetch lists the folder once and re-reads only the files whose
+     modifiedTime changed, as a CSV export of the first tab. Both are Drive API
+     calls: the Sheets API allows only 60 reads per minute, which 37+ brands
+     on several cold Vercel instances use up at once (HTTP 429).
    - A file that fails keeps its last good rows and is reported per brand.
      The brand name is the file name; the row format is the same as any Sheet
      (No HP, Nama, qty, trx value). */
 
 const crypto = require('node:crypto');
-const { rowsToRecords } = require('../aggregate');
+const { parseCSV, rowsToRecords } = require('../aggregate');
 
-const SCOPES = 'https://www.googleapis.com/auth/drive.readonly https://www.googleapis.com/auth/spreadsheets.readonly';
+const SCOPES = 'https://www.googleapis.com/auth/drive.readonly';
 const SPREADSHEET = 'application/vnd.google-apps.spreadsheet';
 
 function createDriveSource(cfg) {
@@ -27,8 +28,7 @@ function createDriveSource(cfg) {
   const concurrency = Math.max(1, cfg.concurrency || 5);
   const urls = Object.assign({
     token: 'https://oauth2.googleapis.com/token',
-    drive: 'https://www.googleapis.com/drive/v3',
-    sheets: 'https://sheets.googleapis.com/v4'
+    drive: 'https://www.googleapis.com/drive/v3'
   }, cfg.urls);
   const files = new Map(); // file id -> { name, mod, records, error, rows }
   let token = null, tokenExp = 0, getting = null;
@@ -52,9 +52,9 @@ function createDriveSource(cfg) {
     return getting;
   }
 
-  async function get(url) {
+  async function get(url, asText) {
     const res = await fetch(url, { headers: { Authorization: 'Bearer ' + await accessToken() }, signal: AbortSignal.timeout(20000) });
-    if (res.ok) return res.json();
+    if (res.ok) return asText ? res.text() : res.json();
     const body = await res.json().catch(() => ({}));
     throw new Error('HTTP ' + res.status + (body.error && body.error.message ? ': ' + body.error.message : ''));
   }
@@ -79,11 +79,9 @@ function createDriveSource(cfg) {
   }
 
   async function readFile(f) {
-    const range = encodeURIComponent('A1:D' + maxRows); // no tab name: the first tab
-    const r = await get(urls.sheets + '/spreadsheets/' + encodeURIComponent(f.id) + '/values/' + range +
-      '?valueRenderOption=UNFORMATTED_VALUE&dateTimeRenderOption=FORMATTED_STRING');
-    const rows = (r.values || []).map((row) => row.map((c) => (c == null ? '' : String(c))))
-      .filter((row) => row.some((c) => c.trim() !== ''));
+    // CSV export holds the first tab only, as displayed (2.500.000 is parsed by toNum)
+    const csv = await get(urls.drive + '/files/' + encodeURIComponent(f.id) + '/export?mimeType=text%2Fcsv', true);
+    const rows = parseCSV(csv).slice(0, maxRows);
     // skipped rows show up in #cek as "Brand:row"
     return rowsToRecords(rows).map((rec) => Object.assign(rec, { line: f.name + ':' + rec.line }));
   }
