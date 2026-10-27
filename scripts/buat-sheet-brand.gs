@@ -143,8 +143,12 @@ function aturAksesAdmin() {
   while (it.hasNext()) {
     var f = it.next();
     f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
-    admin.forEach(function (e) { f.addEditor(e); });
-    Logger.log(f.getName() + ': akses link mati, editor ' + admin.join(', '));
+    var gagal = [];
+    admin.forEach(function (e) {
+      try { f.addEditor(e); } catch (err) { gagal.push(e + ' (' + err.message + ')'); }
+    });
+    Logger.log(f.getName() + ': akses link mati, editor ' + admin.join(', ') +
+      (gagal.length ? '  ! gagal: ' + gagal.join('; ') : ''));
     n++;
   }
   Logger.log('Selesai: ' + n + ' file brand. Akun layanan papan tetap membaca lewat folder (Viewer); jangan hapus aksesnya.');
