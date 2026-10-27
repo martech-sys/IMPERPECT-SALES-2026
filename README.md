@@ -337,17 +337,16 @@ Format tiap file — baris pertama judul, satu baris = satu transaksi:
    Google Workspace yang membatasi share ke luar domain perlu mengizinkan domain
    `iam.gserviceaccount.com` (Admin console → Drive → Sharing settings).
 3. **Buat file per brand** dengan [`scripts/buat-sheet-brand.gs`](scripts/buat-sheet-brand.gs) (daftar
-   37 brand event 2026 sudah terisi): buka [script.google.com](https://script.google.com) → *New project* →
-   tempel isi file → isi `FOLDER` → pilih `buatSheetBrand` → **Run**. Script membuat file dengan judul
-   kolom, kolom No HP berformat teks, dan validasi angka. Dengan `AKSES = 'link'` (bawaan) tiap file
-   dibuka *Anyone with the link → Editor*, tanpa email; dengan `'email'` hanya email di `BRANDS` yang
-   diberi akses. Link tiap brand ditulis ke spreadsheet **Daftar Link Sheet Brand** di My Drive admin:
-   kirim ke tiap brand **hanya link miliknya**. Aman dijalankan ulang (brand baru tinggal ditambah).
+   brand event 2026 sudah terisi): buka [script.google.com](https://script.google.com) → *New project* →
+   tempel isi file → isi `FOLDER` dan `ADMIN` → pilih `buatSheetBrand` → **Run**. Script membuat file
+   dengan judul kolom, kolom No HP berformat teks, dan validasi angka. Dengan `AKSES = 'email'` (bawaan)
+   tiap file hanya bisa dibuka email di `ADMIN` (Editor di **setiap file**, bukan di folder) dan email
+   brand di `BRANDS`; admin yang menambah akses tim brand per file lewat *Share*. `aturAksesAdmin`
+   menerapkan ini ke file yang sudah ada dan mematikan akses link. Link tiap brand ditulis ke
+   spreadsheet **Daftar Link Sheet Brand** di My Drive pembuat. Aman dijalankan ulang.
 
-   > Dengan akses link, siapa pun yang memegang link sebuah file bisa melihat dan mengubah isinya
-   > (termasuk nomor HP pembeli). Brand tetap tidak bisa melihat file brand lain selama link tidak
-   > disebar. Link file tidak bisa diganti; kalau satu link bocor, ubah file itu ke *Share → General
-   > access → Restricted* lalu tambahkan email tim brand tersebut. Riwayat perubahan ada di
+   > `AKSES = 'link'` membuka tiap file *Anyone with the link → Editor*: cepat, tapi siapa pun yang
+   > memegang link bisa melihat dan mengubah isinya (termasuk nomor HP pembeli). Riwayat perubahan ada di
    > *File → Version history*.
 4. **Vercel → Settings → Environment Variables** (Production), lalu **Redeploy**:
 
