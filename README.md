@@ -309,7 +309,8 @@ brand**, semuanya di **satu folder Google Drive**. Papan membaca folder itu deng
   **brand tidak bisa melihat omzet brand lain** (daftar isi folder dan link brand lain tidak terlihat).
 - Folder di-share **sekali** ke email akun layanan (Viewer); semua file di dalamnya (termasuk yang
   ditambahkan nanti) otomatis terbaca. Tidak perlu daftar link atau sheet MASTER.
-- Nama file = nama brand (muncul di `#cek`). Yang dibaca: tab **pertama**, kolom A–D.
+- Nama file = nama brand (muncul di `#cek`). Yang dibaca: tab **pertama** (diekspor sebagai CSV lewat
+  Drive API; kolom dikenali dari judulnya).
 - Tiap pembacaan: 1× daftar isi folder, lalu hanya file yang **berubah** sejak pembacaan terakhir yang
   dibaca ulang. File yang gagal dibaca tetap memakai data terakhirnya; nama brand dan errornya terlihat
   di `#cek` dan `/healthz` (bukan di TV).
@@ -324,7 +325,8 @@ Format tiap file — baris pertama judul, satu baris = satu transaksi:
 
 1. **Buat akun layanan** — [console.cloud.google.com](https://console.cloud.google.com):
    1. Pilih/buat project (mis. `imperfect-papan-tv`).
-   2. **APIs & Services → Library**: aktifkan **Google Drive API** dan **Google Sheets API**.
+   2. **APIs & Services → Library**: aktifkan **Google Drive API**. (Google Sheets API tidak dipakai:
+      jatahnya hanya 60 baca/menit, terlalu kecil untuk 37+ brand.)
    3. **IAM & Admin → Service Accounts → Create service account**, nama mis. `papan-tv`. Lewati langkah
       *roles* dan *grant users access* (tidak perlu role apa pun).
    4. Buka akun layanan itu → **Keys → Add key → Create new key → JSON**. File `.json` terunduh.
@@ -363,7 +365,8 @@ Kalau gagal:
 | Pesan | Perbaikan |
 |---|---|
 | `Folder Drive tidak bisa dibaca (HTTP 404 …). Share folder ke … sebagai Viewer` | Folder belum di-share ke email akun layanan, atau `DRIVE_FOLDER` salah. |
-| `HTTP 403 … has not been used in project` | Google Drive API / Google Sheets API belum diaktifkan (langkah 1.2). |
+| `HTTP 403 … has not been used in project` | Google Drive API belum diaktifkan (langkah 1.2). |
+| `HTTP 429: Quota exceeded … sheets.googleapis.com` | Deploy lama yang masih memakai Sheets API. Redeploy dari `main` terbaru. |
 | `Login akun layanan gagal: invalid_grant` | Kunci sudah dihapus / salah tempel. Buat key JSON baru. |
 | `GOOGLE_SERVICE_ACCOUNT_JSON bukan JSON yang valid` | Tempel ulang seluruh isi file, dari `{` sampai `}`. |
 | Brand tidak muncul | File harus berupa Google Sheets (bukan `.xlsx`) dan berada langsung di folder itu. |

@@ -11,8 +11,8 @@ const { privateKey, publicKey } = crypto.generateKeyPairSync('rsa', { modulusLen
 const PEM = privateKey.export({ type: 'pkcs8', format: 'pem' });
 const SA = JSON.stringify({ client_email: 'papan@proj.iam.gserviceaccount.com', private_key: PEM });
 
-/* Stand-in for oauth2 + Drive v3 + Sheets v4: checks the JWT signature and
-   the bearer token, lists one folder, serves values per file. */
+/* Stand-in for oauth2 + Drive v3: checks the JWT signature and the bearer
+   token, lists one folder, exports each file's first tab as CSV. */
 function mockGoogle() {
   const calls = { token: 0, list: 0, values: [] };
   const state = {
@@ -22,8 +22,8 @@ function mockGoogle() {
       { id: 'f3', name: 'Boonaboo', modifiedTime: '2026-10-30T03:00:00Z' }
     ],
     values: {
-      f1: [['No HP', 'Nama', 'qty', 'trx value'], [6281234567890, 'Dewi Lestari', 2, 1500000], ['', '', '', ''], ['bukan hp', 'X', 1, 100]],
-      f2: [['No HP', 'Nama', 'qty', 'trx value'], ['081234567890', 'Dewi', 1, '2.500.000']],
+      f1: [['No HP', 'Nama', 'qty', 'trx value'], ['6281234567890', 'Dewi Lestari', '2', '1,500,000'], ['', '', '', ''], ['bukan hp', 'X', '1', '100']],
+      f2: [['No HP', 'Nama', 'qty', 'trx value'], ['081234567890', 'Dewi', '1', '2.500.000']],
       f3: [['No HP', 'Nama', 'qty', 'trx value']]
     },
     fail: new Set()
@@ -49,11 +49,12 @@ function mockGoogle() {
       calls.list++; calls.q = url.searchParams.get('q');
       return send(200, { files: state.files });
     }
-    const m = url.pathname.match(/^\/sheets\/spreadsheets\/([^/]+)\/values\/(.+)$/);
+    const m = url.pathname.match(/^\/drive\/files\/([^/]+)\/export$/);
     if (m) {
-      calls.values.push(m[1]); calls.range = decodeURIComponent(m[2]);
-      if (state.fail.has(m[1])) return send(403, { error: { message: 'The caller does not have permission' } });
-      return send(200, { values: state.values[m[1]] });
+      calls.values.push(m[1]); calls.mime = url.searchParams.get('mimeType');
+      if (state.fail.has(m[1])) return send(429, { error: { message: 'Quota exceeded' } });
+      res.writeHead(200, { 'Content-Type': 'text/csv' });
+      return res.end(state.values[m[1]].map((r) => r.map((c) => (/[",]/.test(c) ? '"' + c.replace(/"/g, '""') + '"' : c)).join(',')).join('\r\n'));
     }
     send(404, {});
   });
@@ -67,7 +68,7 @@ async function start(t) {
   const base = 'http://127.0.0.1:' + g.srv.address().port;
   g.source = (extra) => createDriveSource(Object.assign({
     json: SA, folder: 'https://drive.google.com/drive/folders/FOLDER123abc?usp=sharing',
-    urls: { token: base + '/token', drive: base + '/drive', sheets: base + '/sheets' }
+    urls: { token: base + '/token', drive: base + '/drive' }
   }, extra));
   return g;
 }
@@ -78,10 +79,9 @@ test('Drive: every spreadsheet in the folder is a brand, merged per phone', asyn
   const recs = await src.fetch();
 
   assert.equal(g.calls.claims.iss, 'papan@proj.iam.gserviceaccount.com');
-  assert.match(g.calls.claims.scope, /drive\.readonly/);
-  assert.match(g.calls.claims.scope, /spreadsheets\.readonly/);
+  assert.equal(g.calls.claims.scope, 'https://www.googleapis.com/auth/drive.readonly');
   assert.match(g.calls.q, /'FOLDER123abc' in parents/);
-  assert.equal(g.calls.range, 'A1:D5000', 'first tab, columns A:D');
+  assert.equal(g.calls.mime, 'text/csv', 'first tab as CSV, through the Drive API (no Sheets API quota)');
   assert.deepEqual(g.calls.values.sort(), ['f1', 'f2', 'f3']);
 
   const { map, stat } = aggregate(recs);
@@ -99,7 +99,7 @@ test('Drive: later fetches only re-read edited files; a failing file keeps its l
   assert.equal(g.calls.values.length, 3, 'nothing changed: no file is read again');
   assert.equal(g.calls.token, 1, 'access token is reused');
 
-  g.state.values.f2.push(['085711112222', 'Rina', 1, 300000]);
+  g.state.values.f2.push(['085711112222', 'Rina', '1', '300000']);
   g.state.files[1].modifiedTime = '2026-10-30T04:00:00Z';
   g.state.files[0].modifiedTime = '2026-10-30T04:00:00Z';
   g.state.fail.add('f1');
@@ -108,7 +108,7 @@ test('Drive: later fetches only re-read edited files; a failing file keeps its l
   const { map } = aggregate(recs);
   assert.equal(map.get('081234567890').v, 4000000, 'Heymale failed now but its last rows stay');
   assert.equal(map.get('085711112222').v, 300000, 'Heylocal edit picked up');
-  assert.deepEqual(src.info().failed, [{ brand: 'Heymale', error: 'HTTP 403: The caller does not have permission' }]);
+  assert.deepEqual(src.info().failed, [{ brand: 'Heymale', error: 'HTTP 429: Quota exceeded' }]);
 
   g.state.files = g.state.files.filter((f) => f.id !== 'f2');
   const after = aggregate(await src.fetch());
