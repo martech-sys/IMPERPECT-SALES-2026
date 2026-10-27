@@ -135,23 +135,34 @@ function buatSheetBrand() {
 
 // Matikan akses link di semua file brand dan jadikan ADMIN Editor tiap file.
 // Link yang sudah dikirim ke brand tidak bisa dibuka lagi kecuali email
-// pembukanya diberi akses oleh admin. Aman dijalankan ulang.
+// pembukanya diberi akses oleh admin. Aman dijalankan ulang: email yang sudah
+// jadi Editor dilewati, jadi "! gagal" cukup diulang dengan Run lagi.
+// "Action not allowed" untuk email di luar domain biasanya batas undangan
+// Google: Run lagi nanti, atau KIRIM_EMAIL = false (butuh layanan Drive API).
 function aturAksesAdmin() {
   var admin = adminValid_();
   if (!admin.length) throw new Error('Isi ADMIN dengan email admin dulu.');
+  var totalGagal = 0;
   var n = 0, it = DriveApp.getFolderById(folderId_(FOLDER)).getFilesByType(MimeType.GOOGLE_SHEETS);
   while (it.hasNext()) {
     var f = it.next();
     f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
     var gagal = [];
+    var sudah = f.getEditors().map(function (u) { return u.getEmail().toLowerCase(); });
     admin.forEach(function (e) {
-      try { f.addEditor(e); } catch (err) { gagal.push(e + ' (' + err.message + ')'); }
+      if (sudah.indexOf(e.toLowerCase()) >= 0) return;
+      try {
+        if (KIRIM_EMAIL) f.addEditor(e);
+        else Drive_addEditorTanpaEmail_(f.getId(), e);
+      } catch (err) { gagal.push(e + ' (' + err.message + ')'); }
     });
+    totalGagal += gagal.length;
     Logger.log(f.getName() + ': akses link mati, editor ' + admin.join(', ') +
       (gagal.length ? '  ! gagal: ' + gagal.join('; ') : ''));
     n++;
   }
-  Logger.log('Selesai: ' + n + ' file brand. Akun layanan papan tetap membaca lewat folder (Viewer); jangan hapus aksesnya.');
+  Logger.log('Selesai: ' + n + ' file brand' + (totalGagal ? ', ' + totalGagal + ' akses gagal (Run lagi untuk mengulang)' : ', semua akses berhasil') +
+    '. Akun layanan papan tetap membaca lewat folder (Viewer); jangan hapus aksesnya.');
 }
 
 function adminValid_() {
