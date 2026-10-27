@@ -65,7 +65,8 @@ var BRANDS = [
   'Herschel (Primer Group)',
   'Hydroflask (Primer Group)',
   'Erspo',
-  'Radwah'
+  'Radwah',
+  'HanaSabria'
 ].join('\n');
 
 // AKSES 'email': false = brand tidak menerima email undangan dari Google

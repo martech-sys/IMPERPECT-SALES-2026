@@ -337,7 +337,7 @@ Format tiap file — baris pertama judul, satu baris = satu transaksi:
    Google Workspace yang membatasi share ke luar domain perlu mengizinkan domain
    `iam.gserviceaccount.com` (Admin console → Drive → Sharing settings).
 3. **Buat file per brand** dengan [`scripts/buat-sheet-brand.gs`](scripts/buat-sheet-brand.gs) (daftar
-   37 brand event 2026 sudah terisi): buka [script.google.com](https://script.google.com) → *New project* →
+   38 brand event 2026 sudah terisi): buka [script.google.com](https://script.google.com) → *New project* →
    tempel isi file → isi `FOLDER` → pilih `buatSheetBrand` → **Run**. Script membuat file dengan judul
    kolom, kolom No HP berformat teks, dan validasi angka. Dengan `AKSES = 'link'` (bawaan) tiap file
    dibuka *Anyone with the link → Editor*, tanpa email; dengan `'email'` hanya email di `BRANDS` yang
