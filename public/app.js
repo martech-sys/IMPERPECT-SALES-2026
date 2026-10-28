@@ -82,7 +82,7 @@ function rowEl(r,rank){
    berulang, berhenti sejenak di peringkat 11. Kedua kolom memuat 10 baris. */
 var TOP=10,GAP=1;
 var flow={on:false,o:0,hold:DWELL,L:0};
-var lastT=0,vel=0,remC=remPx(),RAMP=1.6,rowPx=0,sigA='',sigB='';
+var lastT=0,vel=0,remC=remPx(),RAMP=1.6,rowPx=0,sigA='',sigB='',moving=false;
 /* numbered placeholder rows keep the board's shape when there are few or no sales */
 function ghostRow(rank){
   var li=el('div','row ghost'+(rank<=3?' top':''));
@@ -147,6 +147,8 @@ function tick(t){
       else{flow.o+=vel*dt;if(flow.o>=flow.L-.25){flow.o=0;flow.hold=DWELL;vel=0;}}
     }
     trkB.style.transform='translate3d(0,'+(-flow.o).toFixed(2)+'px,0)';
+    var mv=flow.o>.5;
+    if(mv!==moving){moving=mv;colB.classList.toggle('moving',mv);}
   }
   requestAnimationFrame(tick);
 }
