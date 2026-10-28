@@ -71,7 +71,7 @@ button.chip{font-family:inherit;cursor:pointer}
 .champ .lbl{display:block;font-weight:700;font-size:1.2rem;letter-spacing:.14em;text-transform:uppercase;opacity:.92}
 .champ b{display:block;margin-top:.3rem;font-weight:800;font-size:3.4rem;line-height:1;white-space:nowrap}
 .champ small{display:block;margin-top:.3rem;font-weight:500;font-size:1.3rem;opacity:.9;white-space:nowrap}
-.lists{display:grid;grid-template-columns:1fr 1fr;column-gap:4rem;min-height:0}
+.lists{position:relative;display:grid;grid-template-columns:1fr 1fr;column-gap:4rem;min-height:0}
 .col{position:relative;overflow:hidden;min-height:0;
 }
 .track{will-change:transform;backface-visibility:hidden;transform:translateZ(0)}
@@ -88,7 +88,24 @@ button.chip{font-family:inherit;cursor:pointer}
 .row.top .rk{color:var(--sun)}
 .row.r1{background:var(--cream);color:var(--ink);border-bottom-color:transparent}
 .row.r1 .rk{color:var(--orange-deep)}
-.empty{font-weight:500;font-size:2rem;line-height:1.3;padding:1.6rem 1rem;border-top:.1rem solid var(--line)}
+/* before the first sale: the board's shape in faint placeholder rows, and a call-out on top */
+.row.ghost .rk{opacity:.45}
+.row.ghost .bar{display:block;height:1.5rem;background:rgba(255,246,236,.2)}
+.row.ghost .bar.sm{height:1rem;margin-top:.45rem;background:rgba(255,246,236,.12)}
+.row.ghost .val b{opacity:.28}
+.row.ghost .val small{opacity:.22}
+.wait{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.wait .card{background:var(--cream);color:var(--ink);text-align:center;padding:3.2rem 5rem 3.4rem;
+  box-shadow:1rem 1rem 0 var(--orange-deep);max-width:62rem}
+.wait .kicker{display:inline-flex;align-items:center;gap:.8rem;font-weight:800;font-size:1.3rem;letter-spacing:.16em;
+  text-transform:uppercase;color:var(--orange-deep)}
+.wait .kicker i{width:1rem;height:1rem;background:var(--orange);animation:pulse 1.8s ease-in-out infinite}
+.wait h2{font-family:var(--font-display);font-weight:400;font-size:6rem;line-height:.95;margin:1.4rem 0 0;
+  text-transform:uppercase;color:var(--orange)}
+.wait h2 .cur{display:inline-block;width:.5em;height:.8em;margin-left:.15em;background:var(--orange);vertical-align:-.02em;
+  animation:blink 1.1s steps(1) infinite}
+.wait p{margin:1.6rem 0 0;font-size:2rem;font-weight:600;line-height:1.3}
+@keyframes blink{50%{opacity:0}}
 
 @media (max-width:900px){
   :root{font-size:2.55vw}
@@ -102,8 +119,11 @@ button.chip{font-family:inherit;cursor:pointer}
   .lists{grid-template-columns:1fr}
   .col{-webkit-mask-image:none;mask-image:none}
   .row{height:auto;min-height:4.6rem;padding:.6rem}
+  .wait{position:static;order:-1;margin-bottom:2rem}
+  .wait .card{padding:2.4rem 2rem;box-shadow:.6rem .6rem 0 var(--orange-deep)}
+  .wait h2{font-size:4.4rem}
 }
-@media (prefers-reduced-motion:reduce){.chip .dot{animation:none}}
+@media (prefers-reduced-motion:reduce){.chip .dot,.wait .kicker i,.wait h2 .cur{animation:none}}
 </style>
 </head>
 <body>
@@ -140,6 +160,13 @@ button.chip{font-family:inherit;cursor:pointer}
   <section class="lists" id="lists" aria-label="Ranking jastiper">
     <div class="col" id="col-a"><div class="track" id="trk-a"></div></div>
     <div class="col" id="col-b"><div class="track" id="trk-b"></div></div>
+    <div class="wait" id="wait" hidden>
+      <div class="card">
+        <span class="kicker"><i></i>Ranking dibuka</span>
+        <h2>Siapa jastiper pertama?<span class="cur"></span></h2>
+        <p>Belanja sekarang dan jadi juara sementara Imperfect Sale 2026.</p>
+      </div>
+    </div>
   </section>
   <div class="lastup" id="lastup">Last update: <span id="lastup-t">menunggu data...</span></div>
 </main>

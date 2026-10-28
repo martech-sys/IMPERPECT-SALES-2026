@@ -31,7 +31,7 @@ function clock(iso){
   }catch(e){return '';}
 }
 
-/* ---------- example data (labelled on screen) ---------- */
+/* ---------- example data: only on …/#contoh (for design checks), never on the TV ---------- */
 function sampleState(){
   var seed=7;
   function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
@@ -58,7 +58,10 @@ function sampleState(){
 /* ---------- render: dua kolom ranking yang bergerak ---------- */
 var note=$('chip-sample'),act=$('chip-action'),diagChip=$('chip-diag');
 var colB=$('col-b'),trkA=$('trk-a'),trkB=$('trk-b');
-var current=null,lastSig='';
+var current=null,lastSig='',live=null; /* live = last state from the server */
+function demo(){return location.hash==='#contoh';}
+/* #contoh shows example data; otherwise the real ranking, empty ("Rp 0") until the first sale */
+function show(){render(demo()?sampleState():(live||{top:[]}));}
 var mobile=false;
 try{mobile=window.matchMedia('(max-width:900px)').matches;}catch(e){}
 function remPx(){return parseFloat(getComputedStyle(document.documentElement).fontSize)||16;}
@@ -83,6 +86,30 @@ function fillStatic(trk,list,startRank){
   trk.textContent='';trk.style.transform='';
   list.forEach(function(r,i){trk.appendChild(rowEl(r,startRank+i));});
 }
+/* empty board: numbered placeholder rows keep the board's shape behind the call-out */
+function ghostRow(rank){
+  var li=el('div','row ghost'+(rank<=3?' top':''));
+  li.appendChild(el('span','rk',String(rank)));
+  var who=el('span','who'),w=[62,48,70,55,66,44,58,51][rank%8];
+  var a=el('span','bar');a.style.width=w+'%';who.appendChild(a);
+  var b=el('span','bar sm');b.style.width=Math.round(w*.55)+'%';who.appendChild(b);
+  li.appendChild(who);
+  var val=el('span','val');
+  val.appendChild(el('b',null,'Rp 0'));
+  val.appendChild(el('small',null,'0 trx · 0 pcs'));
+  li.appendChild(val);
+  return li;
+}
+function layoutEmpty(){
+  var rem=remPx(),lists=$('lists'),H=lists.clientHeight;
+  var cap=mobile?3:Math.max(1,Math.floor(H/(4.6*rem)));
+  flow.on=false;colB.hidden=mobile;
+  if(!mobile) lists.style.setProperty('--rowh',(H/cap/rem).toFixed(3)+'rem');
+  [trkA,trkB].forEach(function(t,c){
+    t.textContent='';t.style.transform='';
+    for(var i=1;i<=cap;i++) t.appendChild(ghostRow(c*cap+i));
+  });
+}
 function layout(top){
   var rem=remPx(),lists=$('lists'),H=lists.clientHeight;remC=rem;
   var cap=mobile?1e9:Math.max(1,Math.floor(H/(4.6*rem))),n=top.length;
@@ -92,9 +119,11 @@ function layout(top){
   var rowPx=H/cap;
   lists.style.setProperty('--rowh',(rowPx/rem).toFixed(3)+'rem');
   if(n<=cap*2||reduced){
-    var k=Math.min(n,cap);
-    fillStatic(trkA,top.slice(0,k),1);
-    fillStatic(trkB,top.slice(k,k*2),k+1);
+    // few jastiper yet: real rows first, the remaining slots as numbered placeholders
+    [trkA,trkB].forEach(function(t,c){
+      t.textContent='';t.style.transform='';
+      for(var i=c*cap;i<(c+1)*cap;i++) t.appendChild(i<n?rowEl(top[i],i+1):ghostRow(i+1));
+    });
     return;
   }
   var GAP=2,pass,i;
@@ -140,17 +169,16 @@ function render(s){
   var top=s.top||[];
   var lead=top[0];
   $('champ-v').textContent=lead?money(lead.v):'Rp 0';
-  $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Belum ada transaksi';
+  $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Menunggu transaksi pertama';
   $('board-sub').textContent='Belanja terbesar per nomor HP · '+nf.format(top.length)+' jastiper';
 
   // rebuild the columns only when the ranking changed, so a poll does not restart the scroll
   var sig=top.length+'|'+top.map(function(r){return r.p+':'+r.v+':'+r.t;}).join(',');
   if(sig!==lastSig){
     lastSig=sig;
-    if(!top.length){
-      trkB.textContent='';flow.on=false;trkA.textContent='';
-      trkA.appendChild(el('div','empty','Belum ada transaksi. Jadi yang pertama masuk papan ini.'));
-    }else layout(top);
+    $('wait').hidden=top.length>0;
+    if(!top.length) layoutEmpty();
+    else layout(top);
   }
 
   var isSample=!!s.sample;
@@ -202,15 +230,10 @@ function onSnapshot(snap){
   if(snap.pollMs) pollMs=Math.max(5000,snap.pollMs);
   var st=snap.state;
   if(!st){
-    if(!current||current.sample) render(sampleState());
-    showNote('Menunggu data pertama dari server...');
-  }else if(!st.top.length){
-    render(sampleState());
-    showNote('Belum ada transaksi. Menampilkan data contoh.');
-    stamp(st.updatedAt);
+    if(!live){show();showNote('Menunggu data pertama dari server...');}
   }else{
-    saveLocal(st);
-    render(st);
+    // an empty ranking is stored too, so cleared test data does not come back from this browser's cache
+    live=st;saveLocal(st);show();
     stamp(st.updatedAt);
   }
   showDiag(snap);
@@ -227,11 +250,11 @@ function poll(){
   }).then(onSnapshot).catch(function(e){console.error(e);onFail();}).then(function(){setTimeout(poll,pollMs);});
 }
 function boot(){
-  var local=loadLocal();
-  render(local||sampleState());
-  if(local){showNote('Memuat data terbaru...');if(local.updatedAt) stamp(local.updatedAt);}
+  live=loadLocal();
+  show();
+  if(live){showNote('Memuat data terbaru...');if(live.updatedAt) stamp(live.updatedAt);}
   poll();
 }
-window.addEventListener('hashchange',function(){if(location.hash!=='#cek') diagChip.hidden=true;});
+window.addEventListener('hashchange',function(){if(location.hash!=='#cek') diagChip.hidden=true;lastSig='';show();});
 boot();
 })();
