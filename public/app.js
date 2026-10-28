@@ -69,8 +69,8 @@ function rowEl(r,rank){
   var li=el('div','row'+(rank<=3?' top':'')+(rank===1?' r1':''));
   li.appendChild(el('span','rk',String(rank)));
   var who=el('span','who');
+  who.appendChild(el('span','nm',r.n||'Pelanggan')); /* name big, masked phone small below */
   who.appendChild(el('span','ph',r.p));
-  who.appendChild(el('span','nm',r.n||'Pelanggan'));
   li.appendChild(who);
   var val=el('span','val');
   val.appendChild(el('b',null,money(r.v)));
@@ -171,7 +171,7 @@ function render(s){
   var top=s.top||[];
   var lead=top[0];
   $('champ-v').textContent=lead?money(lead.v):'Rp 0';
-  $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Menunggu transaksi pertama';
+  $('champ-p').textContent=lead?((lead.n?lead.n+' · ':'')+lead.p):'Menunggu transaksi pertama';
   $('board-sub').textContent='Belanja terbesar per nomor HP · '+nf.format(top.length)+' jastiper';
 
   // rebuild a column only when its part of the ranking changed, so a poll does not restart the scroll
