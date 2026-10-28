@@ -86,6 +86,30 @@ function fillStatic(trk,list,startRank){
   trk.textContent='';trk.style.transform='';
   list.forEach(function(r,i){trk.appendChild(rowEl(r,startRank+i));});
 }
+/* empty board: numbered placeholder rows keep the board's shape behind the call-out */
+function ghostRow(rank){
+  var li=el('div','row ghost'+(rank<=3?' top':''));
+  li.appendChild(el('span','rk',String(rank)));
+  var who=el('span','who'),w=[62,48,70,55,66,44,58,51][rank%8];
+  var a=el('span','bar');a.style.width=w+'%';who.appendChild(a);
+  var b=el('span','bar sm');b.style.width=Math.round(w*.55)+'%';who.appendChild(b);
+  li.appendChild(who);
+  var val=el('span','val');
+  val.appendChild(el('b',null,'Rp 0'));
+  val.appendChild(el('small',null,'0 trx · 0 pcs'));
+  li.appendChild(val);
+  return li;
+}
+function layoutEmpty(){
+  var rem=remPx(),lists=$('lists'),H=lists.clientHeight;
+  var cap=mobile?3:Math.max(1,Math.floor(H/(4.6*rem)));
+  flow.on=false;colB.hidden=mobile;
+  if(!mobile) lists.style.setProperty('--rowh',(H/cap/rem).toFixed(3)+'rem');
+  [trkA,trkB].forEach(function(t,c){
+    t.textContent='';t.style.transform='';
+    for(var i=1;i<=cap;i++) t.appendChild(ghostRow(c*cap+i));
+  });
+}
 function layout(top){
   var rem=remPx(),lists=$('lists'),H=lists.clientHeight;remC=rem;
   var cap=mobile?1e9:Math.max(1,Math.floor(H/(4.6*rem))),n=top.length;
@@ -95,9 +119,11 @@ function layout(top){
   var rowPx=H/cap;
   lists.style.setProperty('--rowh',(rowPx/rem).toFixed(3)+'rem');
   if(n<=cap*2||reduced){
-    var k=Math.min(n,cap);
-    fillStatic(trkA,top.slice(0,k),1);
-    fillStatic(trkB,top.slice(k,k*2),k+1);
+    // few jastiper yet: real rows first, the remaining slots as numbered placeholders
+    [trkA,trkB].forEach(function(t,c){
+      t.textContent='';t.style.transform='';
+      for(var i=c*cap;i<(c+1)*cap;i++) t.appendChild(i<n?rowEl(top[i],i+1):ghostRow(i+1));
+    });
     return;
   }
   var GAP=2,pass,i;
@@ -143,17 +169,16 @@ function render(s){
   var top=s.top||[];
   var lead=top[0];
   $('champ-v').textContent=lead?money(lead.v):'Rp 0';
-  $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Belum ada transaksi';
+  $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Menunggu transaksi pertama';
   $('board-sub').textContent='Belanja terbesar per nomor HP · '+nf.format(top.length)+' jastiper';
 
   // rebuild the columns only when the ranking changed, so a poll does not restart the scroll
   var sig=top.length+'|'+top.map(function(r){return r.p+':'+r.v+':'+r.t;}).join(',');
   if(sig!==lastSig){
     lastSig=sig;
-    if(!top.length){
-      trkB.textContent='';flow.on=false;trkA.textContent='';
-      trkA.appendChild(el('div','empty','Belum ada transaksi. Jadi yang pertama masuk papan ini.'));
-    }else layout(top);
+    $('wait').hidden=top.length>0;
+    if(!top.length) layoutEmpty();
+    else layout(top);
   }
 
   var isSample=!!s.sample;
