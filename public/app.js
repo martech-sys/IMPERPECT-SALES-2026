@@ -55,7 +55,7 @@ function sampleState(){
   return {sample:true,updatedAt:null,top:top};
 }
 
-/* ---------- render: dua kolom ranking yang bergerak ---------- */
+/* ---------- render: Top 10 terkunci + peringkat 11 ke bawah bergulir ---------- */
 var note=$('chip-sample'),act=$('chip-action'),diagChip=$('chip-diag');
 var colB=$('col-b'),trkA=$('trk-a'),trkB=$('trk-b');
 var current=null,lastSig='',live=null; /* live = last state from the server */
@@ -78,15 +78,12 @@ function rowEl(r,rank){
   li.appendChild(val);
   return li;
 }
-/* satu aliran: kolom kiri = jendela awal, kolom kanan = lanjutan persis di bawahnya.
-   Baris yang keluar di atas kolom kanan masuk ke bawah kolom kiri, satu irama. */
-var flow={on:false,o:0,hold:DWELL,L:0,H:0};
-var lastT=0,vel=0,remC=remPx(),RAMP=1.6;
-function fillStatic(trk,list,startRank){
-  trk.textContent='';trk.style.transform='';
-  list.forEach(function(r,i){trk.appendChild(rowEl(r,startRank+i));});
-}
-/* empty board: numbered placeholder rows keep the board's shape behind the call-out */
+/* Kiri: Top 10, terkunci. Kanan: peringkat 11 ke bawah, bergulir otomatis dan
+   berulang, berhenti sejenak di peringkat 11. Kedua kolom memuat 10 baris. */
+var TOP=10,GAP=1;
+var flow={on:false,o:0,hold:DWELL,L:0};
+var lastT=0,vel=0,remC=remPx(),RAMP=1.6,rowPx=0,sigA='',sigB='';
+/* numbered placeholder rows keep the board's shape when there are few or no sales */
 function ghostRow(rank){
   var li=el('div','row ghost'+(rank<=3?' top':''));
   li.appendChild(el('span','rk',String(rank)));
@@ -100,44 +97,42 @@ function ghostRow(rank){
   li.appendChild(val);
   return li;
 }
-function layoutEmpty(){
-  var rem=remPx(),lists=$('lists'),H=lists.clientHeight;
-  var cap=mobile?3:Math.max(1,Math.floor(H/(4.6*rem)));
-  flow.on=false;colB.hidden=mobile;
-  if(!mobile) lists.style.setProperty('--rowh',(H/cap/rem).toFixed(3)+'rem');
-  [trkA,trkB].forEach(function(t,c){
-    t.textContent='';t.style.transform='';
-    for(var i=1;i<=cap;i++) t.appendChild(ghostRow(c*cap+i));
-  });
+function fill(trk,top,from,to){
+  trk.textContent='';trk.style.transform='';
+  for(var i=from;i<to;i++) trk.appendChild(i<top.length?rowEl(top[i],i+1):ghostRow(i+1));
 }
-function layout(top){
-  var rem=remPx(),lists=$('lists'),H=lists.clientHeight;remC=rem;
-  var cap=mobile?1e9:Math.max(1,Math.floor(H/(4.6*rem))),n=top.length;
-  flow.on=false;
-  if(mobile){fillStatic(trkA,top,1);trkB.textContent='';colB.hidden=true;return;}
-  colB.hidden=false;
-  var rowPx=H/cap;
-  lists.style.setProperty('--rowh',(rowPx/rem).toFixed(3)+'rem');
-  if(n<=cap*2||reduced){
-    // few jastiper yet: real rows first, the remaining slots as numbered placeholders
-    [trkA,trkB].forEach(function(t,c){
-      t.textContent='';t.style.transform='';
-      for(var i=c*cap;i<(c+1)*cap;i++) t.appendChild(i<n?rowEl(top[i],i+1):ghostRow(i+1));
-    });
+function sizeRows(){
+  var rem=remPx();remC=rem;
+  if(mobile){$('lists').style.removeProperty('--rowh');return;}
+  // whole pixels, so ten rows never add up to more than the column and the 10th is not cut off
+  rowPx=Math.floor($('col-a').clientHeight/TOP);
+  $('lists').style.setProperty('--rowh',rowPx+'px');
+}
+function layoutA(top){
+  fill(trkA,top,0,mobile?Math.max(Math.min(top.length,TOP),3):TOP);
+}
+function layoutB(top){
+  var n=top.length-TOP;
+  $('head-b-t').textContent=n>0?'Peringkat 11 – '+nf.format(top.length):'Peringkat 11+';
+  flow.on=false;colB.classList.remove('flowing');
+  if(mobile){
+    colB.hidden=$('head-b').hidden=n<=0;
+    if(n>0) fill(trkB,top,TOP,top.length);
     return;
   }
-  var GAP=2,pass,i;
-  [trkA,trkB].forEach(function(t){
-    t.textContent='';
-    for(pass=0;pass<2;pass++){
-      for(i=0;i<n;i++) t.appendChild(rowEl(top[i],i+1));
-      for(i=0;i<GAP;i++) t.appendChild(el('div','row spacer'));
-    }
-  });
-  flow.L=(n+GAP)*rowPx;flow.H=H;flow.on=true;
-  if(flow.o>=flow.L){flow.o=0;flow.hold=DWELL;}
+  colB.hidden=$('head-b').hidden=false;
+  if(n<=TOP||reduced){fill(trkB,top,TOP,TOP*2);return;}
+  trkB.textContent='';
+  for(var pass=0;pass<2;pass++){
+    for(var i=TOP;i<top.length;i++) trkB.appendChild(rowEl(top[i],i+1));
+    for(i=0;i<GAP;i++) trkB.appendChild(el('div','row spacer'));
+  }
+  flow.L=(n+GAP)*rowPx;flow.on=true;colB.classList.add('flowing');
+  // a ranking update keeps the scroll where it is instead of jumping back to 11
+  if(flow.o>=flow.L){flow.o=0;flow.hold=DWELL;vel=0;}
+  trkB.style.transform='translate3d(0,'+(-flow.o).toFixed(2)+'px,0)';
 }
-/* gerak halus: kecepatan naik-turun pelan (ease) saat mulai dan saat berhenti di peringkat 1,
+/* gerak halus: kecepatan naik-turun pelan (ease) saat mulai dan saat berhenti di peringkat 11,
    posisi sub-piksel di layer GPU supaya tidak patah-patah */
 function tick(t){
   var dt=lastT?Math.min(.05,(t-lastT)/1000):0;lastT=t;
@@ -151,13 +146,18 @@ function tick(t){
       if(vel<1e-3&&left<.5){flow.o=0;flow.hold=DWELL;vel=0;}
       else{flow.o+=vel*dt;if(flow.o>=flow.L-.25){flow.o=0;flow.hold=DWELL;vel=0;}}
     }
-    var oa=flow.o%flow.L,ob=(flow.o+flow.H)%flow.L;
-    trkA.style.transform='translate3d(0,'+(-oa).toFixed(2)+'px,0)';
-    trkB.style.transform='translate3d(0,'+(-ob).toFixed(2)+'px,0)';
+    trkB.style.transform='translate3d(0,'+(-flow.o).toFixed(2)+'px,0)';
   }
   requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
+/* the column height settles only after the web fonts load: re-fit the ten rows whenever it changes */
+try{
+  new ResizeObserver(function(){
+    if(!current||mobile) return;
+    if(Math.floor($('col-a').clientHeight/TOP)!==rowPx){lastSig='';render(current);}
+  }).observe($('col-a'));
+}catch(e){}
 var rzT=0;
 window.addEventListener('resize',function(){clearTimeout(rzT);rzT=setTimeout(function(){
   try{mobile=window.matchMedia('(max-width:900px)').matches;}catch(e){}
@@ -172,14 +172,14 @@ function render(s){
   $('champ-p').textContent=lead?(lead.p+(lead.n?' · '+lead.n:'')):'Menunggu transaksi pertama';
   $('board-sub').textContent='Belanja terbesar per nomor HP · '+nf.format(top.length)+' jastiper';
 
-  // rebuild the columns only when the ranking changed, so a poll does not restart the scroll
-  var sig=top.length+'|'+top.map(function(r){return r.p+':'+r.v+':'+r.t;}).join(',');
-  if(sig!==lastSig){
-    lastSig=sig;
-    $('wait').hidden=top.length>0;
-    if(!top.length) layoutEmpty();
-    else layout(top);
-  }
+  // rebuild a column only when its part of the ranking changed, so a poll does not restart the scroll
+  var force=!lastSig;lastSig='x';
+  if(force) sizeRows();
+  var key=function(r){return r.p+':'+r.v+':'+r.t+':'+r.n;};
+  var ka=top.slice(0,TOP).map(key).join(','),kb=top.length+'|'+top.slice(TOP).map(key).join(',');
+  if(force||ka!==sigA){sigA=ka;layoutA(top);}
+  if(force||kb!==sigB){sigB=kb;layoutB(top);}
+  $('wait').hidden=top.length>0;
 
   var isSample=!!s.sample;
   $('chip-live').hidden=isSample;
