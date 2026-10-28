@@ -91,7 +91,13 @@ function rowsToRecords(rows) {
 }
 
 /* records -> per-phone totals. Returns the merged map plus counts so the
-   diagnostics chip can say how many rows each source contributed or skipped. */
+   diagnostics chip can say how many rows each source contributed or skipped.
+
+   One phone can be written with different names (full name, nickname, ...).
+   The board shows the short name used most often for that phone; on a tie the
+   longer one (more complete), then alphabetical. The choice does not depend on
+   row order, which Postgres and Drive do not guarantee, so the name on the TV
+   does not flip between refreshes. */
 function aggregate(records, map) {
   map = map || new Map();
   const stat = { rows: records.length, valid: 0, skipped: [] };
@@ -99,8 +105,18 @@ function aggregate(records, map) {
     const ph = normPhone(r.phone), v = toNum(r.value), q = toNum(r.qty);
     if (!ph || !(v > 0)) { stat.skipped.push(r.line != null ? r.line : i + 1); return; }
     let e = map.get(ph);
-    if (!e) { e = { p: ph, n: '', q: 0, t: 0, v: 0 }; map.set(ph, e); }
-    if (!e.n) e.n = shortName(r.name);
+    if (!e) {
+      e = { p: ph, n: '', q: 0, t: 0, v: 0 };
+      Object.defineProperty(e, 'names', { value: new Map() }); // not sent to the TV
+      map.set(ph, e);
+    }
+    const n = shortName(r.name);
+    if (n) {
+      const c = (e.names.get(n) || 0) + 1;
+      e.names.set(n, c);
+      const best = e.n ? e.names.get(e.n) : 0;
+      if (c > best || (c === best && (n.length > e.n.length || (n.length === e.n.length && n < e.n)))) e.n = n;
+    }
     e.q += q > 0 ? q : 0; e.t += 1; e.v += v; stat.valid++;
   });
   return { map, stat };
