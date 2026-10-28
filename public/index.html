@@ -8,7 +8,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;700;800&family=Tiny5&display=swap" rel="stylesheet">
 <style>
-/* Layout: fixed 16:9 TV stage (1rem = 1% of stage width).
+/* Layout: TV stage 16:9 or taller, always filling the screen height
+   (1rem = 1% of stage width; a 16:10 screen gets taller rows, no empty bands).
    Data comes from /api/state (Postgres + brand Sheets merged on the server).
    Header: logo, title, current leader. Below: the Top 10, fixed, on the left; ranks
    11 and down on the right, scrolling on a loop.
@@ -43,17 +44,17 @@ body{
 
 .stage{
   position:relative;z-index:2;box-sizing:border-box;
-  width:100rem;height:56.25rem;padding:3.2rem 4rem 4.2rem;
+  width:100rem;height:100vh;height:100dvh;padding:2.4rem 4rem 4.6rem;
   display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:1.8rem;overflow:hidden;
 }
-.lastup{position:absolute;right:4rem;bottom:1rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
+.lastup{position:absolute;right:4rem;bottom:1.85rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
 .left{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
 .right{display:flex;flex-direction:column;min-width:0}
 
 /* header */
 .head{display:grid;grid-template-columns:20rem minmax(0,1fr) auto;align-items:end;column-gap:3rem}
 .logo{display:block;width:20rem;height:auto;max-width:100%}
-.chips{position:absolute;left:4rem;bottom:.8rem;max-width:62rem;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.8rem}
+.chips{position:absolute;left:4rem;bottom:1rem;max-width:62rem;display:flex;flex-direction:row;flex-wrap:wrap;align-items:center;gap:.8rem}
 .chip{display:inline-flex;align-items:center;gap:.7rem;font-weight:700;font-size:1.15rem;letter-spacing:.12em;text-transform:uppercase;
   padding:.55rem 1.1rem;border:.16rem solid var(--cream);color:var(--cream)}
 .chip .dot{width:.9rem;height:.9rem;background:var(--sun);animation:pulse 1.8s ease-in-out infinite}
@@ -76,14 +77,17 @@ button.chip{font-family:inherit;cursor:pointer}
   font-weight:800;font-size:1.3rem;letter-spacing:.16em;text-transform:uppercase}
 .colhead i{width:1rem;height:1rem;background:var(--sun)}
 .colhead .hint{margin-left:auto;font-weight:600;letter-spacing:.08em;opacity:.75;font-size:1.1rem}
-.col.flowing{-webkit-mask-image:linear-gradient(transparent,#000 1.4rem,#000 calc(100% - 3rem),transparent);
+.col.flowing{-webkit-mask-image:linear-gradient(#000,#000 calc(100% - 3rem),transparent);
+  mask-image:linear-gradient(#000,#000 calc(100% - 3rem),transparent)}
+/* top edge fades only while moving, so rank 11 is crisp during the pause */
+.col.flowing.moving{-webkit-mask-image:linear-gradient(transparent,#000 1.4rem,#000 calc(100% - 3rem),transparent);
   mask-image:linear-gradient(transparent,#000 1.4rem,#000 calc(100% - 3rem),transparent)}
 .col{position:relative;overflow:hidden;min-height:0;
 }
 .track{will-change:transform;backface-visibility:hidden;transform:translateZ(0)}
 .col{contain:layout paint}
 .row{display:grid;grid-template-columns:5rem minmax(0,1fr) auto;align-items:center;column-gap:1rem;height:var(--rowh,4.6rem);padding:0 1rem;border-bottom:.1rem solid var(--line);box-sizing:border-box}
-.row{--rh:var(--rowh,4.6rem)}
+.row{--rh:min(var(--rowh,4.6rem),4.6rem)} /* taller rows on tall screens, type capped */
 .row .rk{font-family:var(--font-display);font-size:calc(var(--rh)*.62);line-height:1}
 .row .who{min-width:0;display:flex;flex-direction:column;gap:calc(var(--rh)*.03)}
 .row .ph{font-weight:800;font-size:calc(var(--rh)*.5);line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
