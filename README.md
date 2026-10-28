@@ -221,7 +221,7 @@ dipakai dashboard OFFLINE-STORE). Tabel itu berisi **satu baris per produk**, de
 ```sql
 SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar) AS value
   FROM laporan_penjualan
- WHERE warehouse = 'MAIN IMPERFECT WAREHOUS 2026'          -- atau channel = '...', lihat cek di bawah
+ WHERE warehouse IN ('MAIN IMPERFECT WAREHOUS 2026', 'TEBUS MURAH IMPERFECT 2026')          -- atau channel = '...', lihat cek di bawah
    AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
  GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order)
 ```
@@ -230,6 +230,9 @@ SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar)
   berulang di tiap baris produknya; invoice berisi 3 produk tetap dihitung satu kali (`MAX`), bukan
   dijumlahkan jadi tiga kali lipat. Invoice-invoice berbeda milik nomor HP yang sama dijumlahkan papan.
 - Invoice tanpa `invoice_number` memakai `no_order` sebagai kunci.
+- Event 2026 memakai **dua gudang**: `MAIN IMPERFECT WAREHOUS 2026` dan `TEBUS MURAH IMPERFECT 2026`.
+  Pengelompokan tetap per invoice (bukan per gudang), jadi invoice yang barisnya tercatat di dua gudang
+  tetap dihitung satu kali. Gudang lain ditambahkan ke daftar `IN (...)`.
 - Batas atas ditulis `< hari berikutnya`, agar transaksi di hari terakhir tidak terbuang kalau `tanggal`
   bertipe timestamp.
 - Transaksi tanpa `no_hp` tidak masuk papan (terlihat sebagai "dilewati" di `#cek`).
@@ -276,7 +279,8 @@ Tabel contoh untuk uji lokal ada di `db/schema.sql` + `db/seed.sql` (`npm run db
 Sumber ini hanya **membaca**: `POST /login` untuk token, sisanya `GET`. Perilaku API sudah dicek di akun
 ini (lihat juga `martech-sys/data-db`, `docs/jubelio-api.md`):
 
-- Gudang event 2026: **`MAIN IMPERFECT WAREHOUS 2026`** (id lokasi 26, outlet POS).
+- Gudang event 2026: **`MAIN IMPERFECT WAREHOUS 2026`** (id lokasi 26, outlet POS). Gudang kedua
+  `TEBUS MURAH IMPERFECT 2026` dibaca lewat Postgres (`PG_QUERY`).
 - `GET /sales/orders/` tidak bisa difilter per lokasi dan hanya memuat **nama** lokasi, jadi order di
   rentang `JUBELIO_DATE_FROM`–`TO` (WIB) dibaca lalu disaring ke `JUBELIO_LOCATION` (nama persis, tidak
   peka huruf besar/kecil). Order batal (`internal_status` `CANCELED`) dilewati.

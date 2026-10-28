@@ -77,6 +77,6 @@ SELECT indexname, indexdef
 EXPLAIN
 SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar) AS value
   FROM laporan_penjualan
- WHERE warehouse = 'MAIN IMPERFECT WAREHOUS 2026'
+ WHERE warehouse IN ('MAIN IMPERFECT WAREHOUS 2026', 'TEBUS MURAH IMPERFECT 2026')
    AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
  GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order);

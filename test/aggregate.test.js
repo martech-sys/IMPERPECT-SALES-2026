@@ -48,6 +48,30 @@ test('Postgres and Sheet records for one buyer are merged into one row', () => {
   assert.deepEqual(st.top[0], { p: '0812-xxxx-7890', n: 'Dewi L.', q: 5, t: 2, v: 50000000 });
 });
 
+test('a phone written with different names shows the most used one, whatever the row order', () => {
+  const recs = [
+    { phone: '081234567890', name: 'Dewi', qty: 1, value: 100 },
+    { phone: '6281234567890', name: 'Kak Dewi', qty: 1, value: 100 },
+    { phone: '081234567890', name: 'Dewi Lestari', qty: 1, value: 100 },
+    { phone: '+62 812-3456-7890', name: 'dewi lestari s', qty: 1, value: 100 },
+    { phone: '081234567890', name: '', qty: 1, value: 100 }
+  ];
+  const names = new Set();
+  for (let k = 0; k < 20; k++) {
+    const shuffled = recs.slice().sort(() => Math.random() - 0.5);
+    names.add(aggregate(shuffled).map.get('081234567890').n);
+  }
+  assert.deepEqual([...names], ['Dewi L.'], '"Dewi Lestari" and "dewi lestari s" both read Dewi L., used twice');
+
+  // tie (each once): the longer, more complete name wins
+  const tie = aggregate([
+    { phone: '085711112222', name: 'Agus', value: 1 },
+    { phone: '085711112222', name: 'Agus Salim', value: 1 }
+  ]).map.get('085711112222');
+  assert.equal(tie.n, 'Agus S.');
+  assert.deepEqual(Object.keys(tie), ['p', 'n', 'q', 't', 'v'], 'name counts are not sent to the TV');
+});
+
 test('sheetCsvUrl turns a share link into the CSV export URL', () => {
   assert.equal(
     sheetCsvUrl('https://docs.google.com/spreadsheets/d/ABC_123/edit?gid=949297504#gid=949297504'),
