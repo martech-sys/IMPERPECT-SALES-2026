@@ -31,7 +31,7 @@ function clock(iso){
   }catch(e){return '';}
 }
 
-/* ---------- example data (labelled on screen) ---------- */
+/* ---------- example data: only on …/#contoh (for design checks), never on the TV ---------- */
 function sampleState(){
   var seed=7;
   function rnd(){seed|=0;seed=seed+0x6D2B79F5|0;var t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;}
@@ -58,7 +58,10 @@ function sampleState(){
 /* ---------- render: dua kolom ranking yang bergerak ---------- */
 var note=$('chip-sample'),act=$('chip-action'),diagChip=$('chip-diag');
 var colB=$('col-b'),trkA=$('trk-a'),trkB=$('trk-b');
-var current=null,lastSig='';
+var current=null,lastSig='',live=null; /* live = last state from the server */
+function demo(){return location.hash==='#contoh';}
+/* #contoh shows example data; otherwise the real ranking, empty ("Rp 0") until the first sale */
+function show(){render(demo()?sampleState():(live||{top:[]}));}
 var mobile=false;
 try{mobile=window.matchMedia('(max-width:900px)').matches;}catch(e){}
 function remPx(){return parseFloat(getComputedStyle(document.documentElement).fontSize)||16;}
@@ -202,15 +205,10 @@ function onSnapshot(snap){
   if(snap.pollMs) pollMs=Math.max(5000,snap.pollMs);
   var st=snap.state;
   if(!st){
-    if(!current||current.sample) render(sampleState());
-    showNote('Menunggu data pertama dari server...');
-  }else if(!st.top.length){
-    render(sampleState());
-    showNote('Belum ada transaksi. Menampilkan data contoh.');
-    stamp(st.updatedAt);
+    if(!live){show();showNote('Menunggu data pertama dari server...');}
   }else{
-    saveLocal(st);
-    render(st);
+    // an empty ranking is stored too, so cleared test data does not come back from this browser's cache
+    live=st;saveLocal(st);show();
     stamp(st.updatedAt);
   }
   showDiag(snap);
@@ -227,11 +225,11 @@ function poll(){
   }).then(onSnapshot).catch(function(e){console.error(e);onFail();}).then(function(){setTimeout(poll,pollMs);});
 }
 function boot(){
-  var local=loadLocal();
-  render(local||sampleState());
-  if(local){showNote('Memuat data terbaru...');if(local.updatedAt) stamp(local.updatedAt);}
+  live=loadLocal();
+  show();
+  if(live){showNote('Memuat data terbaru...');if(live.updatedAt) stamp(live.updatedAt);}
   poll();
 }
-window.addEventListener('hashchange',function(){if(location.hash!=='#cek') diagChip.hidden=true;});
+window.addEventListener('hashchange',function(){if(location.hash!=='#cek') diagChip.hidden=true;lastSig='';show();});
 boot();
 })();
