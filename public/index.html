@@ -10,8 +10,8 @@
 <style>
 /* Layout: fixed 16:9 TV stage (1rem = 1% of stage width).
    Data comes from /api/state (Postgres + brand Sheets merged on the server).
-   Header: logo, title, current leader. Below: every jastiper in two columns that
-   scroll as one stream (the right column continues the left one).
+   Header: logo, title, current leader. Below: the Top 10, fixed, on the left; ranks
+   11 and down on the right, scrolling on a loop.
    One look on purpose: orange KV, white type, read from across a room. */
 :root{
   --orange:#E2531F;
@@ -44,7 +44,7 @@ body{
 .stage{
   position:relative;z-index:2;box-sizing:border-box;
   width:100rem;height:56.25rem;padding:3.2rem 4rem 4.2rem;
-  display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:2.2rem;overflow:hidden;
+  display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:1.8rem;overflow:hidden;
 }
 .lastup{position:absolute;right:4rem;bottom:1rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
 .left{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
@@ -71,27 +71,34 @@ button.chip{font-family:inherit;cursor:pointer}
 .champ .lbl{display:block;font-weight:700;font-size:1.2rem;letter-spacing:.14em;text-transform:uppercase;opacity:.92}
 .champ b{display:block;margin-top:.3rem;font-weight:800;font-size:3.4rem;line-height:1;white-space:nowrap}
 .champ small{display:block;margin-top:.3rem;font-weight:500;font-size:1.3rem;opacity:.9;white-space:nowrap}
-.lists{position:relative;display:grid;grid-template-columns:1fr 1fr;column-gap:4rem;min-height:0}
+.lists{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:auto minmax(0,1fr);column-gap:4rem;min-height:0}
+.colhead{display:flex;align-items:center;gap:.8rem;padding:0 1rem .7rem;border-bottom:.2rem solid var(--cream);
+  font-weight:800;font-size:1.3rem;letter-spacing:.16em;text-transform:uppercase}
+.colhead i{width:1rem;height:1rem;background:var(--sun)}
+.colhead .hint{margin-left:auto;font-weight:600;letter-spacing:.08em;opacity:.75;font-size:1.1rem}
+.col.flowing{-webkit-mask-image:linear-gradient(transparent,#000 1.4rem,#000 calc(100% - 3rem),transparent);
+  mask-image:linear-gradient(transparent,#000 1.4rem,#000 calc(100% - 3rem),transparent)}
 .col{position:relative;overflow:hidden;min-height:0;
 }
 .track{will-change:transform;backface-visibility:hidden;transform:translateZ(0)}
 .col{contain:layout paint}
 .row{display:grid;grid-template-columns:5rem minmax(0,1fr) auto;align-items:center;column-gap:1rem;height:var(--rowh,4.6rem);padding:0 1rem;border-bottom:.1rem solid var(--line);box-sizing:border-box}
-.row .rk{font-family:var(--font-display);font-size:2.7rem;line-height:1}
-.row .who{min-width:0;display:flex;flex-direction:column;gap:.15rem}
-.row .ph{font-weight:800;font-size:1.9rem;line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
-.row .nm{font-weight:500;font-size:1.3rem;line-height:1.1;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.row .val{text-align:right;display:flex;flex-direction:column;gap:.15rem}
-.row .val b{font-weight:800;font-size:2rem;line-height:1.05;white-space:nowrap}
-.row .val small{font-weight:500;font-size:1.25rem;opacity:.88;white-space:nowrap}
+.row{--rh:var(--rowh,4.6rem)}
+.row .rk{font-family:var(--font-display);font-size:calc(var(--rh)*.62);line-height:1}
+.row .who{min-width:0;display:flex;flex-direction:column;gap:calc(var(--rh)*.03)}
+.row .ph{font-weight:800;font-size:calc(var(--rh)*.5);line-height:1.05;letter-spacing:-.01em;white-space:nowrap}
+.row .nm{font-weight:500;font-size:calc(var(--rh)*.32);line-height:1.1;opacity:.88;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.row .val{text-align:right;display:flex;flex-direction:column;gap:calc(var(--rh)*.03)}
+.row .val b{font-weight:800;font-size:calc(var(--rh)*.52);line-height:1.05;white-space:nowrap}
+.row .val small{font-weight:500;font-size:calc(var(--rh)*.31);opacity:.88;white-space:nowrap}
 .row.spacer{border-bottom-color:transparent}
 .row.top .rk{color:var(--sun)}
 .row.r1{background:var(--cream);color:var(--ink);border-bottom-color:transparent}
 .row.r1 .rk{color:var(--orange-deep)}
 /* before the first sale: the board's shape in faint placeholder rows, and a call-out on top */
 .row.ghost .rk{opacity:.45}
-.row.ghost .bar{display:block;height:1.5rem;background:rgba(255,246,236,.2)}
-.row.ghost .bar.sm{height:1rem;margin-top:.45rem;background:rgba(255,246,236,.12)}
+.row.ghost .bar{display:block;height:calc(var(--rh)*.36);background:rgba(255,246,236,.2)}
+.row.ghost .bar.sm{height:calc(var(--rh)*.22);margin-top:calc(var(--rh)*.1);background:rgba(255,246,236,.12)}
 .row.ghost .val b{opacity:.28}
 .row.ghost .val small{opacity:.22}
 .wait{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
@@ -116,10 +123,13 @@ button.chip{font-family:inherit;cursor:pointer}
   .chips{position:static;max-width:none;align-items:flex-start;flex-direction:row;flex-wrap:wrap}
   .board-title{font-size:3.2rem;white-space:normal}
   .champ{text-align:left}
-  .lists{grid-template-columns:1fr}
+  .lists{grid-template-columns:1fr;grid-template-rows:none;row-gap:0}
+  #head-b{margin-top:2.4rem}
+  .lists > #head-a{order:1}.lists > #col-a{order:2}.lists > #head-b{order:3}.lists > #col-b{order:4}
+  .col.flowing{-webkit-mask-image:none;mask-image:none}
   .col{-webkit-mask-image:none;mask-image:none}
-  .row{height:auto;min-height:4.6rem;padding:.6rem}
-  .wait{position:static;order:-1;margin-bottom:2rem}
+  .row{--rh:3.8rem;height:auto;min-height:4.6rem;padding:.6rem}
+  .wait{position:static;order:0;margin-bottom:2rem}
   .wait .card{padding:2.4rem 2rem;box-shadow:.6rem .6rem 0 var(--orange-deep)}
   .wait h2{font-size:4.4rem}
 }
@@ -158,6 +168,8 @@ button.chip{font-family:inherit;cursor:pointer}
   </header>
 
   <section class="lists" id="lists" aria-label="Ranking jastiper">
+    <div class="colhead" id="head-a"><i></i>Top 10</div>
+    <div class="colhead" id="head-b"><i></i><span id="head-b-t">Peringkat 11+</span></div>
     <div class="col" id="col-a"><div class="track" id="trk-a"></div></div>
     <div class="col" id="col-b"><div class="track" id="trk-b"></div></div>
     <div class="wait" id="wait" hidden>
