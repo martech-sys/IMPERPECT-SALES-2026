@@ -48,6 +48,8 @@ body{
   display:grid;grid-template-rows:auto minmax(0,1fr) auto;row-gap:1.8rem;overflow:hidden;
 }
 .lastup{position:absolute;right:4rem;bottom:1.85rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
+/* terms note, centred on the footer line between LIVE and Last update */
+.sk{position:absolute;left:50%;bottom:1.85rem;transform:translateX(-50%);margin:0;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
 .left{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
 .right{display:flex;flex-direction:column;min-width:0}
 
@@ -140,6 +142,7 @@ button.chip{font-family:inherit;cursor:pointer}
   .head{grid-template-columns:1fr;row-gap:1.6rem}
   .logo{width:min(100%,38rem)}
   .chips{position:static;max-width:none;align-items:flex-start;flex-direction:row;flex-wrap:wrap}
+  .sk{position:static;transform:none;order:3;text-align:center}
   .board-title{font-size:3.2rem;white-space:normal}
   .champ{text-align:left}
   .lists{grid-template-columns:1fr;grid-template-rows:none;row-gap:0}
@@ -198,11 +201,12 @@ button.chip{font-family:inherit;cursor:pointer}
     <div class="wait" id="wait" hidden>
       <div class="card">
         <span class="kicker"><i></i>Ranking dibuka</span>
-        <h2>Siapa jastiper pertama?<span class="cur"></span></h2>
+        <h2>Siapakah top jastiper?<span class="cur"></span></h2>
       </div>
     </div>
   </section>
   <section class="tiers" id="tiers" aria-label="Hadiah belanja akumulasi"></section>
+  <p class="sk">*Syarat &amp; Ketentuan Berlaku</p>
   <div class="lastup" id="lastup">Last update: <span id="lastup-t">menunggu data...</span></div>
 </main>
 
