@@ -25,7 +25,7 @@ function createDriveSource(cfg) {
   const folderId = folderIdOf(cfg.folder);
   if (!folderId) throw new Error('Isi DRIVE_FOLDER (link atau ID folder Google Drive)');
   const maxRows = Math.max(2, cfg.maxRows || 5000);
-  const concurrency = Math.max(1, cfg.concurrency || 5);
+  const concurrency = Math.max(1, cfg.concurrency || 10); // 38 files cold: ~3.5 s instead of ~6.5 s at 5
   const urls = Object.assign({
     token: 'https://oauth2.googleapis.com/token',
     drive: 'https://www.googleapis.com/drive/v3'
