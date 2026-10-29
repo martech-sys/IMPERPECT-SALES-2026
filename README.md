@@ -225,6 +225,7 @@ SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar)
   FROM laporan_penjualan
  WHERE warehouse IN ('MAIN IMPERFECT WAREHOUS 2026', 'TEBUS MURAH IMPERFECT 2026')          -- atau channel = '...', lihat cek di bawah
    AND tanggal >= DATE '2026-10-30' AND tanggal < DATE '2026-11-02'
+   AND COALESCE(status, '') !~* 'cancel|batal'                -- order batal tidak dihitung
  GROUP BY COALESCE(NULLIF(btrim(invoice_number), ''), no_order)
 ```
 
@@ -232,6 +233,8 @@ SELECT MAX(no_hp) AS phone, MAX(nama) AS name, SUM(qty) AS qty, MAX(total_bayar)
   berulang di tiap baris produknya; invoice berisi 3 produk tetap dihitung satu kali (`MAX`), bukan
   dijumlahkan jadi tiga kali lipat. Invoice-invoice berbeda milik nomor HP yang sama dijumlahkan papan.
 - Invoice tanpa `invoice_number` memakai `no_order` sebagai kunci.
+- Baris dengan `status` yang memuat "cancel" atau "batal" (huruf besar/kecil bebas, mis. `CANCEL`,
+  `Canceled`, `Cancelled`, `BATAL`) **tidak dihitung**. Status kosong tetap dihitung.
 - Event 2026 memakai **dua gudang**: `MAIN IMPERFECT WAREHOUS 2026` dan `TEBUS MURAH IMPERFECT 2026`.
   Pengelompokan tetap per invoice (bukan per gudang), jadi invoice yang barisnya tercatat di dua gudang
   tetap dihitung satu kali. Gudang lain ditambahkan ke daftar `IN (...)`.
