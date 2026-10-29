@@ -172,7 +172,7 @@ function render(s){
   var lead=top[0];
   $('champ-v').textContent=lead?money(lead.v):'Rp 0';
   $('champ-p').textContent=lead?((lead.n?lead.n+' · ':'')+lead.p):'Menunggu transaksi pertama';
-  $('board-sub').textContent='Live ranking belanja jastiper · '+(top.length?nf.format(top.length)+' sudah masuk papan':'Jadilah yang pertama');
+  $('board-sub').textContent='Live ranking belanja jastiper'+(top.length?' · '+nf.format(top.length)+' sudah masuk papan':'');
 
   // rebuild a column only when its part of the ranking changed, so a poll does not restart the scroll
   var force=!lastSig;lastSig='x';
