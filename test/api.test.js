@@ -46,7 +46,7 @@ test('Vercel function serves merged state on /api/state and /healthz', async (t)
 
   assert.equal(state.status, 200);
   assert.equal(state.headers['cache-control'], 'no-store');
-  assert.equal(state.headers['vercel-cdn-cache-control'], 'max-age=30, stale-while-revalidate=120');
+  assert.equal(state.headers['vercel-cdn-cache-control'], 'max-age=30, stale-while-revalidate=86400, stale-if-error=86400');
   assert.equal(state.body.sources.sheet.ok, true);
   assert.deepEqual(state.body.state.top, [{ p: '0877-xxxx-0867', n: 'Bayu', q: 3, t: 2, v: 5000000 }]);
 

@@ -52,7 +52,9 @@ Langkah:
 
 Bedanya dengan server Node: di Vercel sumber data dibaca saat ada request (bukan timer), paling sering
 sekali per `CACHE_SECONDS` per instance, dan hasil `/api/state` di-cache di CDN Vercel selama
-`CACHE_SECONDS`. Jadi berapa pun TV yang membuka halaman, database dibaca paling sering sekali per
+`CACHE_SECONDS`. Setelah itu CDN tetap langsung menjawab dengan ranking terakhir sambil
+memperbarui di belakang layar (`stale-while-revalidate`, juga saat function error), jadi TV tidak
+menunggu function yang baru menyala membaca ulang semua Sheet brand. Jadi berapa pun TV yang membuka halaman, database dibaca paling sering sekali per
 `CACHE_SECONDS`. Kalau satu sumber gagal, data terakhirnya hanya bertahan selama instance function masih
 hangat.
 
