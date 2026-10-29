@@ -8,6 +8,14 @@ var API='api/state';
 var STORE_LS=1500, SPEED=3.4, DWELL=4;  /* SPEED = rem per detik, DWELL = detik berhenti di peringkat 1 */
 var SOURCE_LABEL={postgres:'Postgres',sheet:'Sheet',drive:'Sheet brand',jubelio:'Jubelio'};
 var LS_KEY='imperfect-live-state-v4';
+/* Hadiah belanja akumulasi (total belanja per nomor HP selama event) */
+var TIERS=[
+  {n:1,min:100e6,batas:'Rp 100 jt',hadiah:'Voucher belanja Rp 3 jt'},
+  {n:2,min:200e6,batas:'Rp 200 jt',hadiah:'Smart TV Samsung 4K 50"'},
+  {n:3,min:300e6,batas:'Rp 300 jt',hadiah:'Kulkas LG Side by Side'},
+  {n:4,min:400e6,batas:'Rp 400 jt',hadiah:'Motor Honda Beat'}
+];
+function tierOf(v){for(var i=TIERS.length-1;i>=0;i--) if(v>=TIERS[i].min) return TIERS[i].n;return 0;}
 var reduced=false;
 try{reduced=window.matchMedia('(prefers-reduced-motion: reduce)').matches;}catch(e){}
 
@@ -72,6 +80,8 @@ function rowEl(r,rank){
   who.appendChild(el('span','nm',r.n||'Pelanggan')); /* name big, masked phone small below */
   who.appendChild(el('span','ph',r.p));
   li.appendChild(who);
+  var tn=tierOf(r.v);
+  li.appendChild(el('span','tier'+(tn?' t'+tn:''),tn?'Tier '+tn:''));
   var val=el('span','val');
   val.appendChild(el('b',null,money(r.v)));
   val.appendChild(el('small',null,r.t+' trx · '+r.q+' pcs'));
@@ -91,6 +101,7 @@ function ghostRow(rank){
   var a=el('span','bar');a.style.width=w+'%';who.appendChild(a);
   var b=el('span','bar sm');b.style.width=Math.round(w*.55)+'%';who.appendChild(b);
   li.appendChild(who);
+  li.appendChild(el('span','tier'));
   var val=el('span','val');
   val.appendChild(el('b',null,'Rp 0'));
   val.appendChild(el('small',null,'0 trx · 0 pcs'));
@@ -166,13 +177,32 @@ window.addEventListener('resize',function(){clearTimeout(rzT);rzT=setTimeout(fun
   if(current){lastSig='';render(current);}
 },200);});
 
+function buildTiers(){
+  var box=$('tiers');
+  TIERS.forEach(function(t){
+    var c=el('div','tcard t'+t.n),h=el('div','th');
+    h.appendChild(el('b','tn','Tier '+t.n));
+    h.appendChild(el('b','tb','≥ '+t.batas));
+    c.appendChild(h);
+    c.appendChild(el('span','tp',t.hadiah));
+    var cnt=el('span','tc','');cnt.id='tc-'+t.n;c.appendChild(cnt);
+    box.appendChild(c);
+  });
+}
+buildTiers();
+function tierCounts(top){
+  var c={};TIERS.forEach(function(t){c[t.n]=0;});
+  top.forEach(function(r){var n=tierOf(r.v);if(n) c[n]++;});
+  TIERS.forEach(function(t){$('tc-'+t.n).textContent=nf.format(c[t.n])+' jastiper';});
+}
 function render(s){
   current=s;
   var top=s.top||[];
+  tierCounts(top);
   var lead=top[0];
   $('champ-v').textContent=lead?money(lead.v):'Rp 0';
   $('champ-p').textContent=lead?((lead.n?lead.n+' · ':'')+lead.p):'Menunggu transaksi pertama';
-  $('board-sub').textContent='Live ranking belanja jastiper · '+(top.length?nf.format(top.length)+' sudah masuk papan':'Jadilah yang pertama');
+  $('board-sub').textContent='Live ranking belanja jastiper'+(top.length?' · '+nf.format(top.length)+' sudah masuk papan':'');
 
   // rebuild a column only when its part of the ranking changed, so a poll does not restart the scroll
   var force=!lastSig;lastSig='x';

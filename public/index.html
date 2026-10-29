@@ -45,7 +45,7 @@ body{
 .stage{
   position:relative;z-index:2;box-sizing:border-box;
   width:100rem;height:100vh;height:100dvh;padding:2.4rem 4rem 4.6rem;
-  display:grid;grid-template-rows:auto minmax(0,1fr);row-gap:1.8rem;overflow:hidden;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto;row-gap:1.8rem;overflow:hidden;
 }
 .lastup{position:absolute;right:4rem;bottom:1.85rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
 .left{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
@@ -86,7 +86,7 @@ button.chip{font-family:inherit;cursor:pointer}
 }
 .track{will-change:transform;backface-visibility:hidden;transform:translateZ(0)}
 .col{contain:layout paint}
-.row{display:grid;grid-template-columns:5rem minmax(0,1fr) auto;align-items:center;column-gap:1rem;height:var(--rowh,4.6rem);padding:0 1rem;border-bottom:.1rem solid var(--line);box-sizing:border-box}
+.row{display:grid;grid-template-columns:5rem minmax(0,1fr) auto auto;align-items:center;column-gap:1rem;height:var(--rowh,4.6rem);padding:0 1rem;border-bottom:.1rem solid var(--line);box-sizing:border-box}
 .row{--rh:min(var(--rowh,4.6rem),4.6rem)} /* taller rows on tall screens, type capped */
 .row .rk{font-family:var(--font-display);font-size:calc(var(--rh)*.62);line-height:1}
 .row .who{min-width:0;display:flex;flex-direction:column;gap:calc(var(--rh)*.03)}
@@ -99,6 +99,21 @@ button.chip{font-family:inherit;cursor:pointer}
 .row.top .rk{color:var(--sun)}
 .row.r1{background:var(--cream);color:var(--ink);border-bottom-color:transparent}
 .row.r1 .rk{color:var(--orange-deep)}
+/* tier reached, next to the amount */
+.row .tier{font-weight:800;font-size:calc(var(--rh)*.22);letter-spacing:.12em;text-transform:uppercase;white-space:nowrap}
+.row .tier:not(:empty){padding:calc(var(--rh)*.06) calc(var(--rh)*.14);background:var(--cream);color:var(--ink)}
+.row .tier.t4{background:var(--sun)}
+.row.r1 .tier:not(:empty){background:var(--orange);color:var(--cream)}
+.row.r1 .tier.t4{background:var(--sun);color:var(--ink)}
+/* prize tiers under both columns */
+.tiers{display:grid;grid-template-columns:repeat(4,1fr);gap:1rem}
+.tcard{background:var(--cream);color:var(--ink);padding:.7rem 1.1rem .75rem;display:grid;grid-template-columns:1fr auto;column-gap:1rem;row-gap:.15rem;align-items:baseline}
+.tcard.t4{background:var(--sun)}
+.tcard .th{grid-column:1 / -1;display:flex;justify-content:space-between;align-items:baseline}
+.tcard .tn{font-family:var(--font-display);font-weight:400;font-size:1.6rem;color:var(--orange-deep)}
+.tcard .tb{font-size:1.35rem;font-weight:800}
+.tcard .tp{font-size:1.2rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tcard .tc{font-size:1.1rem;font-weight:700;opacity:.7;white-space:nowrap}
 /* before the first sale: the board's shape in faint placeholder rows, and a call-out on top */
 .row.ghost .rk{opacity:.45}
 .row.ghost .bar{display:block;height:calc(var(--rh)*.36);background:rgba(255,246,236,.2)}
@@ -133,6 +148,10 @@ button.chip{font-family:inherit;cursor:pointer}
   .col.flowing{-webkit-mask-image:none;mask-image:none}
   .col{-webkit-mask-image:none;mask-image:none}
   .row{--rh:3.8rem;height:auto;min-height:4.6rem;padding:.6rem}
+  .tiers{grid-template-columns:1fr 1fr;order:1} /* phone: prizes before the long list */
+  .head{order:0}.lists{order:2}
+  .tcard{grid-template-columns:1fr}
+  .tcard .tp{white-space:normal}
   .wait{position:static;order:0;margin-bottom:2rem}
   .wait .card{padding:2.4rem 2rem;box-shadow:.6rem .6rem 0 var(--orange-deep)}
   .wait h2{font-size:4.4rem}
@@ -184,6 +203,7 @@ button.chip{font-family:inherit;cursor:pointer}
       </div>
     </div>
   </section>
+  <section class="tiers" id="tiers" aria-label="Hadiah belanja akumulasi"></section>
   <div class="lastup" id="lastup">Last update: <span id="lastup-t">menunggu data...</span></div>
 </main>
 
