@@ -22,7 +22,10 @@
  *
  * Sheet tujuan harus ada di folder Drive papan (DRIVE_FOLDER) supaya terbaca
  * papan, dan JANGAN di-share ke brand: isinya nomor HP lengkap pembeli.
- * Tab pertama ditimpa setiap sinkron; tab "Sinkron" berisi status terakhir.
+ * Tab pertama ditimpa setiap sinkron; tab "Sinkron" berisi status terakhir;
+ * tab "Tanpa HP" berisi pesanan yang tidak masuk papan karena No Telp kosong /
+ * tidak valid (atau Grand Total 0), untuk dicek dan dilengkapi manual.
+ * Papan hanya membaca tab pertama, jadi tab lain tidak ikut dihitung.
  */
 
 var SHEET_ID = '1Wcq0-ZffpHpZuQVRsuAVVGLGQWPGeCpGR4GScthA0x4';
@@ -33,6 +36,8 @@ var PREFIX = 'JP';                        // hanya No Pesanan berawalan ini; '' 
 var MENIT_JADWAL = 15;                    // 1, 5, 10, 15 atau 30
 
 var HEADER = ['No HP', 'Nama', 'qty', 'trx value'];
+var TAB_TANPA_HP = 'Tanpa HP';
+var HEADER_TANPA_HP = ['No Pesanan', 'No Telp (asli)', 'Pelanggan', 'Grand Total', 'Lokasi', 'Alasan'];
 
 function sinkronJubelio() {
   var lock = LockService.getScriptLock();
@@ -42,6 +47,7 @@ function sinkronJubelio() {
     var values = ambilLaporan_();
     var hasil = olahLaporan_(values, PREFIX);
     tulis_(hasil.rows);
+    tulisTanpaHp_(hasil.tanpaHpRows);
     status_('OK', hasil, Date.now() - mulai);
     Logger.log('Pesanan ' + (PREFIX || 'semua') + ': ' + hasil.pesanan + ', ditulis: ' + hasil.rows.length +
       ', tanpa HP valid: ' + hasil.tanpaHp + ', cancel: ' + hasil.cancel +
@@ -119,20 +125,35 @@ function olahLaporan_(values, prefix) {
     if (cStatus >= 0 && /cancel|batal/i.test(String(v[cStatus]))) { cancel[no] = true; continue; }
     var o = per[no];
     if (!o) {
-      o = per[no] = { hp: rapikan_(v[cTelp]), nama: String(v[cNama] || '').trim(), qty: 0, total: angka_(v[cTotal]) };
+      o = per[no] = { hp: rapikan_(v[cTelp]), telp: String(v[cTelp] == null ? '' : v[cTelp]).trim(),
+        nama: String(v[cNama] || '').trim(), qty: 0, total: angka_(v[cTotal]),
+        lokasi: cLokasi >= 0 ? String(v[cLokasi]) : '' };
       urut.push(no);
       if (cLokasi >= 0) lokasi[v[cLokasi]] = (lokasi[v[cLokasi]] || 0) + 1;
     }
-    if (!o.hp) o.hp = rapikan_(v[cTelp]);
+    if (!o.hp) { o.hp = rapikan_(v[cTelp]); if (!o.telp) o.telp = String(v[cTelp] == null ? '' : v[cTelp]).trim(); }
     o.qty += cQty >= 0 ? (angka_(v[cQty]) || 0) : 0;
   }
-  var rows = [], tanpaHp = 0;
+  var rows = [], tanpaHpRows = [];
   urut.forEach(function (no) {
     var o = per[no];
-    if (!o.hp || !(o.total > 0)) { tanpaHp++; return; }
+    if (!o.hp || !(o.total > 0)) {
+      tanpaHpRows.push([no, o.telp, o.nama, o.total > 0 ? o.total : '', o.lokasi, alasan_(o)]);
+      return;
+    }
     rows.push([o.hp, o.nama, o.qty || 1, o.total]);
   });
-  return { rows: rows, pesanan: urut.length, tanpaHp: tanpaHp, cancel: Object.keys(cancel).length, lokasi: lokasi };
+  return { rows: rows, tanpaHpRows: tanpaHpRows, pesanan: urut.length, tanpaHp: tanpaHpRows.length,
+    cancel: Object.keys(cancel).length, lokasi: lokasi };
+}
+
+function alasan_(o) {
+  if (!o.hp) {
+    if (!o.telp) return 'No HP kosong';
+    if (/\*/.test(o.telp)) return 'No HP tersamar';
+    return 'No HP tidak valid';
+  }
+  return 'Grand Total kosong / 0';
 }
 
 function rapikan_(x) {
@@ -168,6 +189,24 @@ function tulis_(rows) {
   var last = sh.getLastRow();
   if (last > all.length) sh.getRange(all.length + 1, 1, last - all.length, 4).clearContent();
   sh.getRange(1, 1, 1, 4).setFontWeight('bold');
+  sh.setFrozenRows(1);
+}
+
+// Pesanan yang tidak masuk papan, ditimpa setiap sinkron. Bukan tab pertama,
+// jadi tidak terbaca papan. Isi No HP yang benar di Jubelio, bukan di sini:
+// sinkron berikutnya akan memindahkannya ke tab pertama.
+function tulisTanpaHp_(rows) {
+  var ss = SpreadsheetApp.openById(SHEET_ID);
+  var sh = ss.getSheetByName(TAB_TANPA_HP) || ss.insertSheet(TAB_TANPA_HP, ss.getSheets().length);
+  var all = [HEADER_TANPA_HP].concat(rows), w = HEADER_TANPA_HP.length;
+  var kurang = all.length - sh.getMaxRows();
+  if (kurang > 0) sh.insertRowsAfter(sh.getMaxRows(), kurang);
+  sh.getRange(1, 1, all.length, 2).setNumberFormat('@');
+  sh.getRange(1, 1, all.length, w).setValues(all);
+  var last = sh.getLastRow();
+  if (last > all.length) sh.getRange(all.length + 1, 1, last - all.length, w).clearContent();
+  sh.getRange(1, 1, 1, w).setFontWeight('bold');
+  if (rows.length) sh.getRange(2, 4, rows.length, 1).setNumberFormat('#,##0');
   sh.setFrozenRows(1);
 }
 
