@@ -30,7 +30,7 @@ var LDS = [26, 64];                       // ID lokasi Jubelio
 var DARI = '2026-10-30';                  // hari pertama event (WIB)
 var SAMPAI = '2026-11-01';                // hari terakhir event (WIB)
 var PREFIX = 'JP';                        // hanya No Pesanan berawalan ini; '' = semua pesanan
-var MENIT_JADWAL = 5;                     // 1, 5, 10, 15 atau 30
+var MENIT_JADWAL = 15;                    // 1, 5, 10, 15 atau 30
 
 var HEADER = ['No HP', 'Nama', 'qty', 'trx value'];
 

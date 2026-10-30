@@ -410,7 +410,7 @@ Apps Script yang mengambil laporan **Sales List** Jubelio (lokasi 26 dan 64, 30 
 tanpa Cancel) dan menulisnya ke tab pertama Sheet **Internal** dengan format papan (No HP, Nama, qty,
 trx value), satu baris per pesanan dengan Grand Total diambil sekali. Laporan Jubelio memuat nomor HP
 lengkap, jadi dipakai sebagai pengganti tabel warehouse yang nomornya tersamar
-(`DATA_SOURCES=drive`). Jadwal otomatis lewat `pasangJadwal`; kredensial Jubelio di Script Properties.
+(`DATA_SOURCES=drive`). Jadwal otomatis tiap 15 menit lewat `pasangJadwal`; kredensial Jubelio di Script Properties.
 Sheet Internal harus berada di folder Drive papan dan tidak di-share ke brand.
 
 ## Cadangan manual (kalau papan bermasalah)
