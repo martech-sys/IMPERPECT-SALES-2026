@@ -156,8 +156,9 @@ function gabungTersamar_(per) {
 function normHp_(s) {
   if (/e\+/i.test(String(s))) return '';
   var d = String(s == null ? '' : s).replace(/\D/g, '');
-  if (d.indexOf('62') === 0) d = '0' + d.slice(2);
-  else if (d.charAt(0) === '8') d = '0' + d;
+  if (d.indexOf('00') === 0) d = d.slice(2);        // 0062 812...
+  if (d.indexOf('62') === 0) d = d.slice(2);        // 62 812... / +62 812...
+  d = '0' + d.replace(/^0+/, '');                   // +62 0812..., 812... -> 0812...
   return /^0\d{8,13}$/.test(d) ? d : '';
 }
 
