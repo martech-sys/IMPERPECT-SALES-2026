@@ -32,7 +32,8 @@ function loadConfig(env) {
       json: env.GOOGLE_SERVICE_ACCOUNT_JSON,
       email: env.GOOGLE_SERVICE_ACCOUNT_EMAIL,
       privateKey: env.GOOGLE_PRIVATE_KEY,
-      maxRows: parseInt(env.DRIVE_MAX_ROWS || '5000', 10)
+      maxRows: parseInt(env.DRIVE_MAX_ROWS || '5000', 10),
+      exclude: String(env.DRIVE_EXCLUDE || '').split(/[\n;,]/).map((s) => s.trim()).filter(Boolean)
     },
     jubelio: {
       email: env.JUBELIO_EMAIL,

@@ -204,6 +204,7 @@ Pesan error asli tampil di `/healthz` (`sources.postgres.error`) dan di chip `#c
 | `DRIVE_FOLDER` | – | Link/ID folder Drive berisi satu spreadsheet per brand. Lihat [Sheet brand](#sheet-brand-folder-google-drive--akun-layanan--disarankan-untuk-50-brand). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | – | Isi file key JSON akun layanan. Atau `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`. |
 | `DRIVE_MAX_ROWS` | `5000` | Baris maksimum yang dibaca per file brand. |
+| `DRIVE_EXCLUDE` | – | Nama file brand yang tidak ikut papan, dipisah koma, mis. `Mayoutfit`. Huruf besar/kecil diabaikan. |
 | `SHEET_URLS` | – | Sheet per brand lewat link publik, satu per baris: `Brand \| link`. |
 | `SHEET_URL` | – | Satu Sheet tanpa brand (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |

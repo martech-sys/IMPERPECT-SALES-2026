@@ -30,6 +30,8 @@ function createDriveSource(cfg) {
     token: 'https://oauth2.googleapis.com/token',
     drive: 'https://www.googleapis.com/drive/v3'
   }, cfg.urls);
+  // DRIVE_EXCLUDE: file (brand) names left off the board, e.g. a brand on hold
+  const exclude = new Set((cfg.exclude || []).map((s) => String(s).trim().toLowerCase()));
   const files = new Map(); // file id -> { name, mod, records, error, rows }
   let token = null, tokenExp = 0, getting = null;
 
@@ -72,7 +74,7 @@ function createDriveSource(cfg) {
       let r;
       try { r = await get(urls.drive + '/files?' + q); }
       catch (e) { throw new Error('Folder Drive tidak bisa dibaca (' + e.message + '). Share folder ke ' + key.email + ' sebagai Viewer'); }
-      out.push(...(r.files || []));
+      out.push(...(r.files || []).filter((f) => !exclude.has(String(f.name).trim().toLowerCase())));
       page = r.nextPageToken || '';
     } while (page);
     return out;
