@@ -136,9 +136,11 @@ function olahLaporan_(values, prefix) {
 }
 
 function rapikan_(x) {
-  var s = String(x == null ? '' : x).replace(/[^0-9+]/g, '');
-  if (s.indexOf('+62') === 0) s = '0' + s.slice(3);
-  else if (s.indexOf('62') === 0) s = '0' + s.slice(2);
+  if (/\*/.test(String(x))) return '';                // nomor tersamar
+  var s = String(x == null ? '' : x).replace(/\D/g, '');
+  if (s.indexOf('00') === 0) s = s.slice(2);        // 0062 812...
+  if (s.indexOf('62') === 0) s = s.slice(2);        // 62 812... / +62 812...
+  s = '0' + s.replace(/^0+/, '');                   // +62 0812..., 812... -> 0812...
   return /^08\d{7,11}$/.test(s) ? s : '';
 }
 

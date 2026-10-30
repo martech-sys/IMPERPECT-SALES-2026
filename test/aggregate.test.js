@@ -127,3 +127,10 @@ test('a masked warehouse buyer joins the brand-sheet buyer with the same first n
   ({ map } = aggregate([{ phone: '081200000024', name: 'Dewi A', value: 1 }, { phone: '081311110024', name: 'Dewi B', value: 2 }], map));
   assert.equal(buildState(map).totals.buyers, 3);
 });
+
+test('every way of writing an Indonesian mobile number reads as the same 08... number', () => {
+  const same = ['081234567890', '6281234567890', '+62 812-3456-7890', '81234567890', '+62 0812 3456 7890',
+    '62081234567890', '0062 812 3456 7890', '(+62) 812.3456.7890', '0812 3456 7890'];
+  same.forEach((s) => assert.equal(normPhone(s), '081234567890', s));
+  ['0812345', '6,28123E+12', '', 'abc'].forEach((s) => assert.equal(normPhone(s), '', s));
+});
