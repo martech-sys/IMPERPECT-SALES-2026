@@ -26,12 +26,12 @@ function el(tag,cls,text){var n=document.createElement(tag);if(cls)n.className=c
 var nf=new Intl.NumberFormat('id-ID');
 function parts(v){
   v=Math.max(0,v||0);
-  if(v>=1e9) return {n:(v/1e9).toFixed(2).replace('.',','),u:'bio'};
-  if(v>=1e6) return {n:(v/1e6).toFixed(1).replace('.',','),u:'mio'};
-  if(v>=1e3) return {n:String(Math.round(v/1e3)),u:'k'};
+  if(v>=1e9) return {n:(v/1e9).toFixed(2).replace('.',','),u:'M'};   /* miliar */
+  if(v>=1e6) return {n:(v/1e6).toFixed(1).replace('.',','),u:'jt'};   /* juta */
+  if(v>=1e3) return {n:String(Math.round(v/1e3)),u:'rb'};             /* ribu */
   return {n:String(Math.round(v)),u:''};
 }
-function money(v){var p=parts(v);return 'Rp '+p.n+(p.u==='k'?'k':(p.u?' '+p.u:''));}
+function money(v){var p=parts(v);return 'Rp '+p.n+(p.u?' '+p.u:'');}
 /* The times on the board ("LIVE · UPDATE" and "Last update") are shown this many minutes
    earlier than the server's read: warehouse sales reach the table with a delay, so the
    board states the time its data reflects. 0 shows the read time as is. */
