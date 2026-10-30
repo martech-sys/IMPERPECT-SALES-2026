@@ -26,7 +26,24 @@ function normPhone(s) {
   return /^0\d{8,13}$/.test(d) ? d : '';
 }
 
+/* The warehouse masks phones ("***********24"): only the last two digits are
+   known, so such a buyer is identified by name + those two digits. Full phones
+   keep identifying by number. */
+function normName(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[^a-z\u00c0-\u024f]+/g, ' ').trim();
+}
+
+function buyerKey(phone, name) {
+  const full = normPhone(phone);
+  if (full) return full;
+  const s = String(phone == null ? '' : phone);
+  if (!s.includes('*')) return '';
+  const d = s.replace(/\D/g, ''), nm = normName(name);
+  return d.length >= 2 && nm ? 'm:' + nm + '|' + d.slice(-2) : '';
+}
+
 function maskPhone(d) {
+  if (d.startsWith('m:')) return 'xxxx-xxxx-xx' + d.slice(-2);
   return d.slice(0, 4) + '-xxxx-' + d.slice(-4);
 }
 
@@ -98,11 +115,19 @@ function rowsToRecords(rows) {
    longer one (more complete), then alphabetical. The choice does not depend on
    row order, which Postgres and Drive do not guarantee, so the name on the TV
    does not flip between refreshes. */
+function pickName(names) {
+  let best = '', bc = 0;
+  names.forEach((c, n) => {
+    if (c > bc || (c === bc && (n.length > best.length || (n.length === best.length && n < best)))) { best = n; bc = c; }
+  });
+  return best;
+}
+
 function aggregate(records, map) {
   map = map || new Map();
   const stat = { rows: records.length, valid: 0, skipped: [] };
   records.forEach((r, i) => {
-    const ph = normPhone(r.phone), v = toNum(r.value), q = toNum(r.qty);
+    const ph = buyerKey(r.phone, r.name), v = toNum(r.value), q = toNum(r.qty);
     if (!ph || !(v > 0)) { stat.skipped.push(r.line != null ? r.line : i + 1); return; }
     let e = map.get(ph);
     if (!e) {
@@ -112,17 +137,44 @@ function aggregate(records, map) {
     }
     const n = shortName(r.name);
     if (n) {
-      const c = (e.names.get(n) || 0) + 1;
-      e.names.set(n, c);
-      const best = e.n ? e.names.get(e.n) : 0;
-      if (c > best || (c === best && (n.length > e.n.length || (n.length === e.n.length && n < e.n)))) e.n = n;
+      e.names.set(n, (e.names.get(n) || 0) + 1);
+      e.n = pickName(e.names);
     }
     e.q += q > 0 ? q : 0; e.t += 1; e.v += v; stat.valid++;
   });
   return { map, stat };
 }
 
+/* A masked warehouse buyer and a brand-sheet buyer with a full phone are the
+   same person when the full phone ends in the same two digits and one of its
+   names has the same first name; merged only when exactly one full-phone
+   buyer matches, otherwise both stay separate. */
+function mergeMasked(map) {
+  const first = (n) => normName(n).split(' ')[0];
+  const idx = new Map();
+  map.forEach((e, k) => {
+    if (k.startsWith('m:')) return;
+    new Set(Array.from(e.names.keys(), first)).forEach((f) => {
+      if (!f) return;
+      const id = f + '|' + k.slice(-2);
+      if (!idx.has(id)) idx.set(id, []);
+      idx.get(id).push(e);
+    });
+  });
+  Array.from(map.keys()).forEach((k) => {
+    if (!k.startsWith('m:')) return;
+    const m = map.get(k), hits = idx.get(first(k.slice(2, -3)) + '|' + k.slice(-2));
+    if (!hits || hits.length !== 1) return;
+    const e = hits[0];
+    e.q += m.q; e.t += m.t; e.v += m.v;
+    m.names.forEach((c, n) => e.names.set(n, (e.names.get(n) || 0) + c));
+    e.n = pickName(e.names);
+    map.delete(k);
+  });
+}
+
 function buildState(map, extra) {
+  mergeMasked(map);
   const list = Array.from(map.values()).sort((a, b) => b.v - a.v);
   let sales = 0, qty = 0, trx = 0;
   list.forEach((e) => { sales += e.v; qty += e.q; trx += e.t; });
@@ -134,4 +186,4 @@ function buildState(map, extra) {
   }, extra || {});
 }
 
-module.exports = { toNum, normPhone, maskPhone, shortName, parseCSV, rowsToRecords, aggregate, buildState, STORE_TOP };
+module.exports = { toNum, normPhone, buyerKey, maskPhone, shortName, parseCSV, rowsToRecords, aggregate, buildState, STORE_TOP };
