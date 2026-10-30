@@ -32,9 +32,14 @@ function parts(v){
   return {n:String(Math.round(v)),u:''};
 }
 function money(v){var p=parts(v);return 'Rp '+p.n+(p.u==='k'?'k':(p.u?' '+p.u:''));}
+/* The times on the board ("LIVE · UPDATE" and "Last update") are shown this many minutes
+   earlier than the server's read: warehouse sales reach the table with a delay, so the
+   board states the time its data reflects. 0 shows the read time as is. */
+var TIME_SHIFT_MIN=-15;
+function shifted(iso){return new Date(new Date(iso).getTime()+TIME_SHIFT_MIN*60000);}
 function clock(iso){
   try{
-    var s=new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(new Date(iso));
+    var s=new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(shifted(iso));
     return s.replace('.',':');
   }catch(e){return '';}
 }
@@ -230,7 +235,7 @@ function saveLocal(s){try{var c={};for(var k in s)c[k]=s[k];c.top=(s.top||[]).sl
 /* ---------- status + diagnostics ---------- */
 function stamp(iso){
   try{
-    var f=new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(new Date(iso)).replace(/\./g,':');
+    var f=new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(shifted(iso)).replace(/\./g,':');
     $('lastup-t').textContent=f+' WIB';
   }catch(e){}
 }
