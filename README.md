@@ -204,6 +204,7 @@ Pesan error asli tampil di `/healthz` (`sources.postgres.error`) dan di chip `#c
 | `DRIVE_FOLDER` | – | Link/ID folder Drive berisi satu spreadsheet per brand. Lihat [Sheet brand](#sheet-brand-folder-google-drive--akun-layanan--disarankan-untuk-50-brand). |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | – | Isi file key JSON akun layanan. Atau `GOOGLE_SERVICE_ACCOUNT_EMAIL` + `GOOGLE_PRIVATE_KEY`. |
 | `DRIVE_MAX_ROWS` | `5000` | Baris maksimum yang dibaca per file brand. |
+| `DRIVE_EXCLUDE` | – | Nama file brand yang tidak ikut papan, dipisah koma, mis. `Mayoutfit`. Huruf besar/kecil diabaikan. |
 | `SHEET_URLS` | – | Sheet per brand lewat link publik, satu per baris: `Brand \| link`. |
 | `SHEET_URL` | – | Satu Sheet tanpa brand (Share: *Anyone with the link*, Viewer), ID Sheet, atau link CSV *Publish to web*. |
 | `SHEET_GID` | `0` | Tab yang dibaca bila link tidak memuat `gid`. |
@@ -412,6 +413,10 @@ trx value), satu baris per pesanan dengan Grand Total diambil sekali. Laporan Ju
 lengkap, jadi dipakai sebagai pengganti tabel warehouse yang nomornya tersamar
 (`DATA_SOURCES=drive`). Jadwal otomatis tiap 15 menit lewat `pasangJadwal`; kredensial Jubelio di Script Properties.
 Sheet Internal harus berada di folder Drive papan dan tidak di-share ke brand.
+Pesanan yang tidak masuk papan (No Telp kosong, tersamar, tidak valid, atau Grand Total 0) ditulis ke
+tab **Tanpa HP** dengan No Pesanan, No Telp asli, Pelanggan, Grand Total, Lokasi dan alasannya. Papan
+hanya membaca tab pertama, jadi tab ini tidak ikut dihitung; lengkapi nomornya di Jubelio, sinkron
+berikutnya memindahkan pesanan itu ke papan.
 
 ## Cadangan manual (kalau papan bermasalah)
 

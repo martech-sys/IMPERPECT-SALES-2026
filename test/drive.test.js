@@ -135,3 +135,12 @@ test('Drive: folder not shared with the service account says so', async (t) => {
   });
   await assert.rejects(g.source().fetch(), /Share folder ke papan@proj\.iam\.gserviceaccount\.com sebagai Viewer/);
 });
+
+test('Drive: brands in DRIVE_EXCLUDE are not read and leave the board', async (t) => {
+  const g = await start(t);
+  const src = g.source({ exclude: [' heymale ', 'Tidak Ada'] });
+  const { map } = aggregate(await src.fetch());
+  assert.ok(!g.calls.values.includes('f1'), 'excluded file is not exported');
+  assert.equal(map.get('081234567890').v, 2500000, 'only Heylocal counts');
+  assert.equal(src.info().brands, 2);
+});
