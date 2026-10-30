@@ -288,5 +288,20 @@ function boot(){
   poll();
 }
 window.addEventListener('hashchange',function(){if(location.hash!=='#cek') diagChip.hidden=true;lastSig='';show();});
+
+/* ---------- keep the TV screen on ---------- */
+/* Screen Wake Lock (Chrome/Edge/Android TV/Samsung Internet): stops the screen from dimming or
+   sleeping while the board is visible. The browser drops the lock when the tab is hidden, so it is
+   taken again on return; browsers that require a tap get it on the first click/key. */
+var wake=null;
+function keepAwake(){
+  if(!('wakeLock' in navigator)||document.visibilityState!=='visible'||wake) return;
+  navigator.wakeLock.request('screen').then(function(l){
+    wake=l;l.addEventListener('release',function(){wake=null;});
+  }).catch(function(){});
+}
+document.addEventListener('visibilitychange',keepAwake);
+['click','keydown','touchstart'].forEach(function(ev){document.addEventListener(ev,keepAwake,{passive:true});});
+keepAwake();
 boot();
 })();

@@ -401,6 +401,19 @@ Heylocal | https://docs.google.com/spreadsheets/d/BBB/edit?gid=0
 Tiap brand jadi sumber sendiri (`sheet:Heymale`, …); Sheet yang gagal dibaca tidak menghentikan papan.
 `SHEET_URL` membaca satu Sheet tanpa nama brand.
 
+## Cadangan manual (kalau papan bermasalah)
+
+- `scripts/ranking-manual.sql` — jalankan di tool database (read-only):
+  1. ranking per nomor HP dari warehouse (dua gudang, tanpa order Cancel, `total_bayar` sekali per
+     invoice, tier);
+  2. ringkasan total penjualan / invoice / pembeli;
+  3. riwayat satu nomor HP.
+- `scripts/rekap-manual.gs` — Apps Script (project yang sama dengan `buat-sheet-brand.gs`):
+  `rekapManual` menggabungkan hasil query 1 (ditempel di tab **Postgres**) dengan semua Sheet brand ke
+  tab **Ranking** di spreadsheet **Rekap Manual Ranking** (My Drive).
+
+Hasil keduanya memuat **nomor HP lengkap**: untuk tim internal saja, jangan ditampilkan di TV.
+
 ## Endpoint
 
 - `GET /` — halaman TV
