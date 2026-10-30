@@ -14,6 +14,9 @@ Folder Drive ┼─► server (Node) ─ gabung per nomor HP ─► /api/state �
 ```
 
 - Nomor `0812…`, `62812…`, `+62 812…` dianggap nomor yang sama, dari sumber mana pun.
+- Nomor yang tersamar di warehouse (`***********24`) dikenali dari **nama + 2 digit terakhir**, dan tampil
+  sebagai `xxxx-xxxx-xx24`. Pembeli tersamar digabung ke pembeli Sheet brand yang nomornya berakhiran sama
+  dan nama depannya sama, kalau hanya ada satu yang cocok.
 - Nomor HP disamarkan (`0812-xxxx-7890`) di server; nomor lengkap tidak pernah dikirim ke browser.
 - Kalau satu sumber gagal (DB restart, Sheet tidak bisa dibuka), papan tetap memakai data terakhir
   dari sumber itu tanpa menampilkan peringatan ke penonton; statusnya terlihat di `#cek` dan `/healthz`.

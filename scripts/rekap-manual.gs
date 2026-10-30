@@ -15,6 +15,9 @@
  *      nama, trx, qty, total, tier. Ringkasan ada di Execution log.
  *
  * Logikanya sama dengan papan: nomor 0812 / 62812 / +62 812 dianggap sama,
+ * nomor tersamar dari warehouse ("***********24") dikenali dari nama + 2 digit
+ * terakhir dan digabung ke pembeli Sheet brand yang nomornya berakhiran sama
+ * dan nama depannya sama (kalau hanya ada satu),
  * baris tanpa nomor HP valid atau tanpa nilai dilewati, tier dari total.
  * Nomor HP ditulis LENGKAP: untuk tim internal saja.
  */
@@ -50,6 +53,8 @@ function rekapManual() {
     }
     brand++;
   }
+
+  gabungTersamar_(per);
 
   // 3. Tulis ranking
   var list = Object.keys(per).map(function (hp) { return per[hp]; })
@@ -105,13 +110,47 @@ function kolom_(head) {
 }
 
 function tambah_(per, hpRaw, nama, trx, qty, nilai) {
-  var hp = normHp_(hpRaw), v = angka_(nilai);
-  if (!hp || !(v > 0)) return false;
-  var e = per[hp] = per[hp] || { hp: hp, nama: '', trx: 0, qty: 0, total: 0 };
+  var hp = normHp_(hpRaw), v = angka_(nilai), key = hp;
+  if (!hp) {
+    // nomor tersamar: kunci = nama + 2 digit terakhir
+    var d = String(hpRaw == null ? '' : hpRaw), nn = normNama_(nama);
+    if (d.indexOf('*') < 0 || d.replace(/\D/g, '').length < 2 || !nn) return false;
+    var dua = d.replace(/\D/g, '').slice(-2);
+    key = 'm:' + nn + '|' + dua;
+    hp = '*********' + dua;
+  }
+  if (!(v > 0)) return false;
+  var e = per[key] = per[key] || { hp: hp, nama: '', trx: 0, qty: 0, total: 0, tersamar: key.indexOf('m:') === 0 };
   if (!e.nama && nama) e.nama = String(nama).trim();
   var q = angka_(qty), t = angka_(trx);
   e.trx += t > 0 ? t : 1; e.qty += q > 0 ? q : 0; e.total += v;
   return true;
+}
+
+function normNama_(s) {
+  return String(s == null ? '' : s).toLowerCase().replace(/[^a-z\u00c0-\u024f]+/g, ' ').trim();
+}
+
+// pembeli tersamar digabung ke satu-satunya pembeli bernomor lengkap dengan
+// 2 digit terakhir dan nama depan yang sama
+function gabungTersamar_(per) {
+  var idx = {};
+  Object.keys(per).forEach(function (k) {
+    var e = per[k];
+    if (e.tersamar) return;
+    var id = normNama_(e.nama).split(' ')[0] + '|' + k.slice(-2);
+    (idx[id] = idx[id] || []).push(e);
+  });
+  Object.keys(per).forEach(function (k) {
+    var m = per[k];
+    if (!m.tersamar) return;
+    var hits = idx[normNama_(m.nama).split(' ')[0] + '|' + k.slice(-2)];
+    if (!hits || hits.length !== 1) return;
+    var e = hits[0];
+    e.trx += m.trx; e.qty += m.qty; e.total += m.total;
+    if (m.nama.length > e.nama.length) e.nama = m.nama;
+    delete per[k];
+  });
 }
 
 function normHp_(s) {

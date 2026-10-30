@@ -90,3 +90,40 @@ test('pgNumber reads Postgres NUMERIC strings at any scale', () => {
   assert.equal(pgNumber(null), null);
   assert.equal(pgNumber('Rp 2.500.000'), 'Rp 2.500.000', 'human formats are left to toNum');
 });
+
+test('masked warehouse phones (***********24) count per name + last two digits', () => {
+  // values as the Postgres source hands them over (pgNumber already applied)
+  const pg = [
+    { phone: '***********24', name: 'DEWI LESTARI', qty: 2, value: 150000000 },
+    { phone: '***********24', name: 'Dewi Lestari', qty: 1, value: 60000000 },
+    { phone: '***********24', name: 'Rina', qty: 1, value: 40000000 },
+    { phone: '***********57', name: 'Dewi Lestari', qty: 1, value: 10000000 },
+    { phone: '***********', name: 'Tanpa Digit', qty: 1, value: '1000' },
+    { phone: '***********99', name: '', qty: 1, value: '1000' }
+  ];
+  const { map, stat } = aggregate(pg);
+  assert.equal(stat.valid, 4);
+  assert.deepEqual(stat.skipped, [5, 6], 'no digits or no name: skipped');
+  const st = buildState(map);
+  assert.deepEqual(st.top.map((r) => [r.p, r.n, r.v]), [
+    ['xxxx-xxxx-xx24', 'Dewi L.', 210000000],
+    ['xxxx-xxxx-xx24', 'Rina', 40000000],
+    ['xxxx-xxxx-xx57', 'Dewi L.', 10000000]
+  ]);
+});
+
+test('a masked warehouse buyer joins the brand-sheet buyer with the same first name and last two digits', () => {
+  let { map } = aggregate([{ phone: '***********24', name: 'Dewi Lestari', qty: 2, value: 150000000 }]);
+  ({ map } = aggregate([
+    { phone: '081234567824', name: 'Dewi', qty: 1, value: 50000000 },     // same first name, ends in 24: merged
+    { phone: '081299990024', name: 'Agus', qty: 1, value: 5000000 }       // ends in 24, other name: separate
+  ], map));
+  const st = buildState(map);
+  assert.deepEqual(st.top.map((r) => [r.p, r.v, r.t]), [['0812-xxxx-7824', 200000000, 2], ['0812-xxxx-0024', 5000000, 1]]);
+  assert.equal(st.top[0].n, 'Dewi L.', 'tie on count: the more complete name');
+
+  // two brand-sheet buyers could be "Dewi …24": ambiguous, nothing is merged
+  ({ map } = aggregate([{ phone: '***********24', name: 'Dewi', value: 100 }]));
+  ({ map } = aggregate([{ phone: '081200000024', name: 'Dewi A', value: 1 }, { phone: '081311110024', name: 'Dewi B', value: 2 }], map));
+  assert.equal(buildState(map).totals.buyers, 3);
+});
