@@ -414,7 +414,7 @@ lengkap, jadi dipakai sebagai pengganti tabel warehouse yang nomornya tersamar
 (`DATA_SOURCES=drive`). Jadwal otomatis tiap 15 menit lewat `pasangJadwal`; kredensial Jubelio di Script Properties.
 Sheet Internal harus berada di folder Drive papan dan tidak di-share ke brand.
 Pesanan yang tidak masuk papan (No Telp kosong, tersamar, tidak valid, atau Grand Total 0) ditulis ke
-tab **Tanpa HP** dengan No Pesanan, No Telp asli, Pelanggan, Grand Total, Lokasi dan alasannya. Papan
+tab **Tanpa HP** dengan No Pesanan, No Telp asli, Pelanggan, qty, Grand Total, Lokasi dan alasannya. Papan
 hanya membaca tab pertama, jadi tab ini tidak ikut dihitung; lengkapi nomornya di Jubelio, sinkron
 berikutnya memindahkan pesanan itu ke papan.
 Hasil validasi manual pesanan tanpa HP diisi di tab **Transaksi_Tanpa_HP_Valid** (No HP, Nama, qty,

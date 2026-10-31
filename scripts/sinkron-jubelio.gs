@@ -44,7 +44,7 @@ var MENIT_JADWAL = 15;                    // 1, 5, 10, 15 atau 30
 var HEADER = ['No HP', 'Nama', 'qty', 'trx value'];
 var TAB_TANPA_HP = 'Tanpa HP';
 var TAB_VALIDASI = 'Transaksi_Tanpa_HP_Valid';
-var HEADER_TANPA_HP = ['No Pesanan', 'No Telp (asli)', 'Pelanggan', 'Grand Total', 'Lokasi', 'Alasan'];
+var HEADER_TANPA_HP = ['No Pesanan', 'No Telp (asli)', 'Pelanggan', 'qty', 'Grand Total', 'Lokasi', 'Alasan'];
 
 function sinkronJubelio() {
   var lock = LockService.getScriptLock();
@@ -148,7 +148,7 @@ function olahLaporan_(values, prefix) {
   urut.forEach(function (no) {
     var o = per[no];
     if (!o.hp || !(o.total > 0)) {
-      tanpaHpRows.push([no, o.telp, o.nama, o.total > 0 ? o.total : '', o.lokasi, alasan_(o)]);
+      tanpaHpRows.push([no, o.telp, o.nama, o.qty || 1, o.total > 0 ? o.total : '', o.lokasi, alasan_(o)]);
       return;
     }
     rows.push([o.hp, o.nama, o.qty || 1, o.total]);
@@ -245,7 +245,7 @@ function tulisTanpaHp_(rows) {
   var last = sh.getLastRow();
   if (last > all.length) sh.getRange(all.length + 1, 1, last - all.length, w).clearContent();
   sh.getRange(1, 1, 1, w).setFontWeight('bold');
-  if (rows.length) sh.getRange(2, 4, rows.length, 1).setNumberFormat('#,##0');
+  if (rows.length) sh.getRange(2, 5, rows.length, 1).setNumberFormat('#,##0');
   sh.setFrozenRows(1);
 }
 
