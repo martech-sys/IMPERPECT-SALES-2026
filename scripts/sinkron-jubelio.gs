@@ -26,6 +26,12 @@
  * tab "Tanpa HP" berisi pesanan yang tidak masuk papan karena No Telp kosong /
  * tidak valid (atau Grand Total 0), untuk dicek dan dilengkapi manual.
  * Papan hanya membaca tab pertama, jadi tab lain tidak ikut dihitung.
+ *
+ * Tab "Transaksi_Tanpa_HP_Valid" diisi manual oleh tim (hasil validasi pesanan
+ * dari tab "Tanpa HP"), format sama: No HP | Nama | qty | trx value, boleh
+ * ditambah kolom No Pesanan. Setiap sinkron isinya ikut disalin ke tab pertama
+ * sehingga masuk papan. Kalau No Pesanan diisi dan pesanan itu belakangan
+ * sudah punya No HP valid di Jubelio, baris validasinya dilewati (tidak dobel).
  */
 
 var SHEET_ID = '1Wcq0-ZffpHpZuQVRsuAVVGLGQWPGeCpGR4GScthA0x4';
@@ -37,6 +43,7 @@ var MENIT_JADWAL = 15;                    // 1, 5, 10, 15 atau 30
 
 var HEADER = ['No HP', 'Nama', 'qty', 'trx value'];
 var TAB_TANPA_HP = 'Tanpa HP';
+var TAB_VALIDASI = 'Transaksi_Tanpa_HP_Valid';
 var HEADER_TANPA_HP = ['No Pesanan', 'No Telp (asli)', 'Pelanggan', 'Grand Total', 'Lokasi', 'Alasan'];
 
 function sinkronJubelio() {
@@ -46,11 +53,14 @@ function sinkronJubelio() {
   try {
     var values = ambilLaporan_();
     var hasil = olahLaporan_(values, PREFIX);
-    tulis_(hasil.rows);
+    var valid = bacaValidasi_(hasil.noValid);
+    hasil.validasi = valid;
+    tulis_(hasil.rows.concat(valid.rows));
     tulisTanpaHp_(hasil.tanpaHpRows);
     status_('OK', hasil, Date.now() - mulai);
     Logger.log('Pesanan ' + (PREFIX || 'semua') + ': ' + hasil.pesanan + ', ditulis: ' + hasil.rows.length +
       ', tanpa HP valid: ' + hasil.tanpaHp + ', cancel: ' + hasil.cancel +
+      ', validasi manual: ' + valid.rows.length + ' (dilewati ' + valid.dilewati.length + ')' +
       ', lokasi: ' + JSON.stringify(hasil.lokasi) + ', ' + Math.round((Date.now() - mulai) / 1000) + ' dtk');
   } catch (e) {
     status_('GAGAL: ' + e.message, null, Date.now() - mulai);
@@ -134,7 +144,7 @@ function olahLaporan_(values, prefix) {
     if (!o.hp) { o.hp = rapikan_(v[cTelp]); if (!o.telp) o.telp = String(v[cTelp] == null ? '' : v[cTelp]).trim(); }
     o.qty += cQty >= 0 ? (angka_(v[cQty]) || 0) : 0;
   }
-  var rows = [], tanpaHpRows = [];
+  var rows = [], tanpaHpRows = [], noValid = {};
   urut.forEach(function (no) {
     var o = per[no];
     if (!o.hp || !(o.total > 0)) {
@@ -142,9 +152,38 @@ function olahLaporan_(values, prefix) {
       return;
     }
     rows.push([o.hp, o.nama, o.qty || 1, o.total]);
+    noValid[no] = true;
   });
-  return { rows: rows, tanpaHpRows: tanpaHpRows, pesanan: urut.length, tanpaHp: tanpaHpRows.length,
+  return { rows: rows, tanpaHpRows: tanpaHpRows, noValid: noValid, pesanan: urut.length, tanpaHp: tanpaHpRows.length,
     cancel: Object.keys(cancel).length, lokasi: lokasi };
+}
+
+// Baris hasil validasi manual (tab TAB_VALIDASI). Kolom dicari dari judulnya.
+// noValid: No Pesanan yang sudah masuk dari Jubelio dengan No HP valid.
+function bacaValidasi_(noValid) {
+  var sh = SpreadsheetApp.openById(SHEET_ID).getSheetByName(TAB_VALIDASI);
+  return olahValidasi_(sh && sh.getLastRow() > 1 ? sh.getDataRange().getValues() : [], noValid || {});
+}
+
+function olahValidasi_(values, noValid) {
+  var out = { rows: [], dilewati: [], sudahAda: 0 };
+  if (!values.length) return out;
+  var head = values[0].map(function (h) { return String(h).trim().toLowerCase(); });
+  function col(re) { for (var i = 0; i < head.length; i++) if (re.test(head[i])) return i; return -1; }
+  var cHp = col(/hp|telp|phone|wa/), cNama = col(/nama|pelanggan|name/), cQty = col(/^(qty|jumlah|pcs)/),
+    cNilai = col(/value|nilai|total|trx|omzet/), cNo = col(/pesanan|order|invoice/);
+  // judul kolom salah: sinkron Jubelio tetap jalan, masalahnya tampil di tab Sinkron
+  if (cHp < 0 || cNilai < 0) { out.error = 'judul kolom harus No HP dan trx value'; return out; }
+  for (var r = 1; r < values.length; r++) {
+    var v = values[r];
+    if (!String(v[cHp]).trim() && !String(v[cNilai]).trim()) continue; // baris kosong
+    var no = cNo >= 0 ? String(v[cNo]).trim() : '';
+    if (no && noValid[no]) { out.sudahAda++; continue; }
+    var hp = rapikan_(v[cHp]), nilai = angka_(v[cNilai]), q = cQty >= 0 ? angka_(v[cQty]) : NaN;
+    if (!hp || !(nilai > 0)) { out.dilewati.push(r + 1); continue; }
+    out.rows.push([hp, cNama >= 0 ? String(v[cNama] || '').trim() : '', q > 0 ? q : 1, nilai]);
+  }
+  return out;
 }
 
 function alasan_(o) {
@@ -213,6 +252,10 @@ function tulisTanpaHp_(rows) {
 function status_(teks, hasil, ms) {
   var ss = SpreadsheetApp.openById(SHEET_ID);
   var sh = ss.getSheetByName('Sinkron') || ss.insertSheet('Sinkron');
+  var val = hasil && hasil.validasi;
+  sh.getRange(7, 1, 1, 2).setValues([['Validasi manual (masuk / baris salah)',
+    val ? (val.error ? 'GAGAL: ' + val.error : val.rows.length + ' / ' + (val.dilewati.length ? val.dilewati.length + ' (baris ' + val.dilewati.join(', ') + ')' : 0) +
+      (val.sudahAda ? ', ' + val.sudahAda + ' sudah ada dari Jubelio' : '')) : '']]);
   sh.getRange(1, 1, 6, 2).setValues([
     ['Terakhir sinkron', Utilities.formatDate(new Date(), 'Asia/Jakarta', 'dd MMM yyyy HH:mm:ss') + ' WIB'],
     ['Status', teks],

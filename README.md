@@ -417,6 +417,10 @@ Pesanan yang tidak masuk papan (No Telp kosong, tersamar, tidak valid, atau Gran
 tab **Tanpa HP** dengan No Pesanan, No Telp asli, Pelanggan, Grand Total, Lokasi dan alasannya. Papan
 hanya membaca tab pertama, jadi tab ini tidak ikut dihitung; lengkapi nomornya di Jubelio, sinkron
 berikutnya memindahkan pesanan itu ke papan.
+Hasil validasi manual pesanan tanpa HP diisi di tab **Transaksi_Tanpa_HP_Valid** (No HP, Nama, qty,
+trx value, opsional No Pesanan); setiap sinkron isinya disalin ke tab pertama sehingga ikut papan. Baris
+dengan No Pesanan yang belakangan sudah punya No HP valid di Jubelio dilewati agar tidak dobel. Jumlah
+baris yang masuk / salah tampil di tab **Sinkron**.
 
 ## Cadangan manual (kalau papan bermasalah)
 
