@@ -422,6 +422,14 @@ trx value, opsional No Pesanan); setiap sinkron isinya disalin ke tab pertama se
 dengan No Pesanan yang belakangan sudah punya No HP valid di Jubelio dilewati agar tidak dobel. Jumlah
 baris yang masuk / salah tampil di tab **Sinkron**.
 
+## Top 10 spender dengan nomor lengkap (`scripts/top10-spender.gs`)
+
+Apps Script (project yang sama dengan `buat-sheet-brand.gs`) yang setiap 10 menit membaca tab pertama
+semua file di folder papan, menghitung seperti papan, dan menulis 10 pembeli teratas (nama, nomor HP
+lengkap, total, trx, qty, tier, hadiah) ke spreadsheet **Top 10 Spender** di My Drive. Akses diatur dengan
+`AKSES_TOP10` (`email` / `domain` / `link`, hanya melihat). Isinya data pribadi pembeli: pilih akses
+sesempit mungkin.
+
 ## Cadangan manual (kalau papan bermasalah)
 
 - `scripts/ranking-manual.sql` — jalankan di tool database (read-only):
