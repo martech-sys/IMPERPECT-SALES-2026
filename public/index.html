@@ -47,8 +47,7 @@ body{
   width:100rem;height:100vh;height:100dvh;padding:2.4rem 4rem 4.6rem;
   display:grid;grid-template-rows:auto minmax(0,1fr) auto;row-gap:1.8rem;overflow:hidden;
 }
-.lastup{position:absolute;right:4rem;bottom:1.85rem;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
-/* terms note, centred on the footer line between LIVE and Last update */
+/* terms note, centred on the footer line */
 .sk{position:absolute;left:50%;bottom:1.85rem;transform:translateX(-50%);margin:0;font-size:1.15rem;font-weight:500;letter-spacing:.04em;opacity:.85;white-space:nowrap}
 .left{display:flex;flex-direction:column;justify-content:space-between;min-width:0}
 .right{display:flex;flex-direction:column;min-width:0}
@@ -186,7 +185,6 @@ button.chip{font-family:inherit;cursor:pointer}
       <small id="champ-p">&nbsp;</small>
     </div>
     <div class="chips">
-      <span class="chip" id="chip-live"><i class="dot"></i><span id="live-text">Live</span></span>
       <span class="chip sample" id="chip-sample" hidden>Data contoh</span>
       <button class="chip sample act" id="chip-action" type="button" hidden></button>
       <span class="chip diag" id="chip-diag" hidden></span>
@@ -207,7 +205,6 @@ button.chip{font-family:inherit;cursor:pointer}
   </section>
   <section class="tiers" id="tiers" aria-label="Hadiah belanja akumulasi"></section>
   <p class="sk">*Syarat &amp; Ketentuan Berlaku</p>
-  <div class="lastup" id="lastup">Last update: <span id="lastup-t">menunggu data...</span></div>
 </main>
 
 <script src="app.js"></script>
