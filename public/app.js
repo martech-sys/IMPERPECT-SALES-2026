@@ -85,6 +85,7 @@ function rowEl(r,rank){
 /* Kiri: Top 10, terkunci. Kanan: peringkat 11 ke bawah, bergulir otomatis dan
    berulang, berhenti sejenak di peringkat 11. Kedua kolom memuat 10 baris. */
 var TOP=10,GAP=1;
+var SHOW=50; /* the board lists only the top 50; tier counts still cover every jastiper */
 var flow={on:false,o:0,hold:DWELL,L:0};
 var lastT=0,vel=0,remC=remPx(),RAMP=1.6,rowPx=0,sigA='',sigB='',moving=false;
 /* numbered placeholder rows keep the board's shape when there are few or no sales */
@@ -191,12 +192,12 @@ function tierCounts(top){
 }
 function render(s){
   current=s;
-  var top=s.top||[];
-  tierCounts(top);
+  var all=s.top||[],top=all.slice(0,SHOW);
+  tierCounts(all);
   var lead=top[0];
   $('champ-v').textContent=lead?money(lead.v):'Rp 0';
   $('champ-p').textContent=lead?((lead.n?lead.n+' · ':'')+lead.p):'Menunggu transaksi pertama';
-  $('board-sub').textContent='Live ranking belanja jastiper'+(top.length?' · '+nf.format(top.length)+' sudah masuk papan':'');
+  $('board-sub').textContent='Live ranking belanja jastiper'+(all.length>SHOW?' · Top '+SHOW:all.length?' · '+nf.format(all.length)+' sudah masuk papan':'');
 
   // rebuild a column only when its part of the ranking changed, so a poll does not restart the scroll
   var force=!lastSig;lastSig='x';
