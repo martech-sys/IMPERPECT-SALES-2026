@@ -32,17 +32,6 @@ function parts(v){
   return {n:String(Math.round(v)),u:''};
 }
 function money(v){var p=parts(v);return 'Rp '+p.n+(p.u?' '+p.u:'');}
-/* The times on the board ("LIVE · UPDATE" and "Last update") are shown this many minutes
-   earlier than the server's read: warehouse sales reach the table with a delay, so the
-   board states the time its data reflects. 0 shows the read time as is. */
-var TIME_SHIFT_MIN=-15;
-function shifted(iso){return new Date(new Date(iso).getTime()+TIME_SHIFT_MIN*60000);}
-function clock(iso){
-  try{
-    var s=new Intl.DateTimeFormat('id-ID',{hour:'2-digit',minute:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(shifted(iso));
-    return s.replace('.',':');
-  }catch(e){return '';}
-}
 
 /* ---------- example data: only on …/#contoh (for design checks), never on the TV ---------- */
 function sampleState(){
@@ -218,10 +207,7 @@ function render(s){
   if(force||kb!==sigB){sigB=kb;layoutB(top);}
   $('wait').hidden=top.length>0;
 
-  var isSample=!!s.sample;
-  $('chip-live').hidden=isSample;
-  if(!isSample&&s.updatedAt) $('live-text').textContent='Live · update '+clock(s.updatedAt);
-  note.textContent='Data contoh';note.hidden=!isSample;act.hidden=true;
+  note.textContent='Data contoh';note.hidden=!s.sample;act.hidden=true;
 }
 function showNote(text,actionLabel,fn){
   note.textContent=text;note.hidden=false;
@@ -233,12 +219,6 @@ function loadLocal(){try{var r=localStorage.getItem(LS_KEY);return r?JSON.parse(
 function saveLocal(s){try{var c={};for(var k in s)c[k]=s[k];c.top=(s.top||[]).slice(0,STORE_LS);localStorage.setItem(LS_KEY,JSON.stringify(c));}catch(e){}}
 
 /* ---------- status + diagnostics ---------- */
-function stamp(iso){
-  try{
-    var f=new Intl.DateTimeFormat('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false,timeZone:'Asia/Jakarta'}).format(shifted(iso)).replace(/\./g,':');
-    $('lastup-t').textContent=f+' WIB';
-  }catch(e){}
-}
 function label(name){return SOURCE_LABEL[name]||(name.indexOf('sheet:')===0?'Sheet '+name.slice(6):name);}
 function showDiag(snap){
   if(location.hash!=='#cek'){diagChip.hidden=true;return;}
@@ -271,13 +251,11 @@ function onSnapshot(snap){
   }else{
     // an empty ranking is stored too, so cleared test data does not come back from this browser's cache
     live=st;saveLocal(st);show();
-    stamp(st.updatedAt);
   }
   showDiag(snap);
 }
 function onFail(){
   failed++;
-  if($('lastup-t').textContent.indexOf('menunggu')===0) $('lastup-t').textContent='belum tersambung ke server';
   if(failed>=3) showNote('Koneksi ke server terputus. Menampilkan data terakhir.');
 }
 function poll(){
@@ -289,7 +267,7 @@ function poll(){
 function boot(){
   live=loadLocal();
   show();
-  if(live){showNote('Memuat data terbaru...');if(live.updatedAt) stamp(live.updatedAt);}
+  if(live) showNote('Memuat data terbaru...');
   poll();
 }
 window.addEventListener('hashchange',function(){if(location.hash!=='#cek') diagChip.hidden=true;lastSig='';show();});
