@@ -4,6 +4,7 @@ const { createPostgresSource } = require('./sources/postgres');
 const { createSheetSource } = require('./sources/sheet');
 const { createJubelioSource } = require('./sources/jubelio');
 const { createDriveSource } = require('./sources/drive');
+const { normPhone } = require('./aggregate');
 
 /* One place that turns environment variables into sources, shared by the
    long-running server (server/index.js) and the Vercel Function (server/api.js). */
@@ -27,6 +28,7 @@ function loadConfig(env) {
     },
     sheet: { url: env.SHEET_URL, gid: env.SHEET_GID || '0' },
     brandSheets: parseBrandSheets(env.SHEET_URLS),
+    locks: parseLocks(env.LOCK_TOTALS),
     drive: {
       folder: env.DRIVE_FOLDER,
       json: env.GOOGLE_SERVICE_ACCOUNT_JSON,
@@ -100,4 +102,19 @@ function parseBrandSheets(text) {
     .filter((b) => b.url);
 }
 
-module.exports = { loadConfig, createSources, parseBrandSheets };
+/* LOCK_TOTALS: buyers whose total is fixed by hand (e.g. checked against the
+   receipts), one per line or separated by ";": "No HP = total", or
+   "No HP = total / trx" to fix the transaction count too. The phone is read
+   like any other (0812 / 62812 / +62 812). Lines that do not parse are skipped. */
+function parseLocks(text) {
+  const out = new Map();
+  String(text || '').split(/[\n;]+/).forEach((line) => {
+    const m = line.trim().match(/^([^=]+)=\s*([\d.,]+)\s*(?:\/\s*(\d+))?\s*$/);
+    if (!m) return;
+    const phone = normPhone(m[1]), v = parseInt(m[2].replace(/[.,]/g, ''), 10), t = m[3] ? parseInt(m[3], 10) : 0;
+    if (phone && v > 0) out.set(phone, { v, t });
+  });
+  return out;
+}
+
+module.exports = { loadConfig, createSources, parseBrandSheets, parseLocks };

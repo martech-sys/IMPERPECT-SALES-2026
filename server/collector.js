@@ -45,7 +45,7 @@ function createCollector(sources, opts) {
       });
       // "last update" is the newest successful read, not the time of this attempt
       const newest = Object.values(status).map((s) => s.fetchedAt).filter(Boolean).sort().pop();
-      state = buildState(map, { updatedAt: newest });
+      state = buildState(map, { updatedAt: newest }, opts.locks);
     })().finally(() => { running = null; });
     return running;
   }

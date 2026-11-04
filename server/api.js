@@ -14,7 +14,7 @@ function createApi(env, deps) {
   const settings = loadConfig(env);
   const skipped = []; // why each source was skipped, shown when nothing is configured
   const sources = createSources(settings, (m) => { skipped.push(m); console.warn(m); }, deps);
-  const collector = sources.length ? createCollector(sources, { pollMs: settings.pollMs }) : null;
+  const collector = sources.length ? createCollector(sources, { pollMs: settings.pollMs, locks: settings.locks }) : null;
   const cacheSeconds = Math.max(0, parseInt(env.CACHE_SECONDS || '30', 10));
   let lastRefresh = 0;
 

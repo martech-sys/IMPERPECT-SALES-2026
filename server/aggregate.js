@@ -174,8 +174,25 @@ function mergeMasked(map) {
   });
 }
 
-function buildState(map, extra) {
+/* locks: Map phone -> { v, t } from LOCK_TOTALS. A locked buyer shows that
+   total (and trx, when given) whatever the sources add up to. */
+function applyLocks(map, locks) {
+  if (!locks) return;
+  locks.forEach((lk, ph) => {
+    let e = map.get(ph);
+    if (!e) {
+      e = { p: ph, n: '', q: 0, t: 0, v: 0 };
+      Object.defineProperty(e, 'names', { value: new Map() });
+      map.set(ph, e);
+    }
+    e.v = lk.v;
+    if (lk.t) e.t = lk.t;
+  });
+}
+
+function buildState(map, extra, locks) {
   mergeMasked(map);
+  applyLocks(map, locks);
   const list = Array.from(map.values()).sort((a, b) => b.v - a.v);
   let sales = 0, qty = 0, trx = 0;
   list.forEach((e) => { sales += e.v; qty += e.q; trx += e.t; });
