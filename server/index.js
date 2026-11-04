@@ -15,7 +15,7 @@ if (!sources.length) {
   process.exit(1);
 }
 
-const collector = createCollector(sources, { pollMs: config.pollMs });
+const collector = createCollector(sources, { pollMs: config.pollMs, locks: config.locks });
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 // fixed whitelist: nothing outside these files can be requested

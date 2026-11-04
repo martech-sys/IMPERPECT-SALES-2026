@@ -134,3 +134,19 @@ test('every way of writing an Indonesian mobile number reads as the same 08... n
   same.forEach((s) => assert.equal(normPhone(s), '081234567890', s));
   ['0812345', '6,28123E+12', '', 'abc'].forEach((s) => assert.equal(normPhone(s), '', s));
 });
+
+test('LOCK_TOTALS fixes a buyer total (and trx) whatever the sources add up to', () => {
+  const { parseLocks } = require('../server/config');
+  const locks = parseLocks('+62 813-2601-1015 = 412.560.200 / 60\n0899 = 5\nrusak\n085711112222=1,500,000');
+  assert.deepEqual([...locks.keys()], ['081326011015', '085711112222']);
+  const { map } = aggregate([
+    { phone: '081326011015', name: 'Mikky', qty: 100, value: 141720400 },
+    { phone: '081326011015', name: 'Mikky Frika', qty: 6, value: 894000 },
+    { phone: '081200000000', name: 'Lain', qty: 1, value: 200000000 }
+  ]);
+  const st = buildState(map, {}, locks);
+  assert.deepEqual(st.top[0], { p: '0813-xxxx-1015', n: 'Mikky F.', q: 106, t: 60, v: 412560200 });
+  assert.equal(st.top[1].v, 200000000);
+  assert.equal(st.top[2].v, 1500000, 'a locked phone with no sales yet is added');
+  assert.equal(st.totals.sales, 412560200 + 200000000 + 1500000);
+});
